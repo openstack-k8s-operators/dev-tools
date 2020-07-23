@@ -30,32 +30,8 @@ ocp_worker_disk: 120
 # OCP cluster name
 ocp_cluster_name: ostest
 
-# name of additional host dev pass to worker and OSP controller VMs for ctrlplane traffic
-ocp_osp_host_interface: enp6s0
-
 # Released version of the opm package from the operator-framework
 opm_version: v1.12.5
-
-# guest image used as base for OSP VMs
-rhel_guest_image_url: "http://download.eng.brq.redhat.com/brewroot/packages/rhel-guest-image/8.1/423/images/rhel-guest-image-8.1-423.x86_64.qcow2"
-
-# OSP16 compose for OSP installation of undercloud and OSP controllers
-osp_compose: z2
-
-# Container tag set in containers-prepare-parameter.yaml
-osp_container_tag: 20200416.1
-
-# root password set for OSP VMs
-osp_controller_root_pwd: redhat
-
-# number of OSP controllers to deploy, can be either 1 or 3
-osp_controller_scale: 1
-
-# number of OCP worker nodes should be OSP compute hosts
-osp_compute_scale: 1
-
-# network type for OSP, either ovs or ovn (default)
-osp_network_type: ovn
 
 # operator github url where operators repos are underneath - default https://github.com/openstack-k8s-operators
 #openstack_k8s_operators_https_url: defaults to "https://github.com/openstack-k8s-operators"
@@ -75,14 +51,6 @@ keystone_operator_image: quay.io/openstack-k8s-operators/keystone-operator:v0.0.
 csv_version: 0.0.1
 
 ocp_network_type: OVNKubernetes
-
-# Default worker for the openstackclient pod
-openstackclient_pod_worker: worker-0
-# Default worker for the tripleo-deploy job pod
-tripleo_deploy_job_worker: worker-0
-
-# private ssh key, where {{ converged_ssh_key }}.pub is being added to the stack user of the VM image for undercloud and overcloud
-converged_ssh_key: /home/ocp/.ssh/id_rsa_osp
 
 # Tempest
 tempest_enabled: true
