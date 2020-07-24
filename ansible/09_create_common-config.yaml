@@ -1,0 +1,165 @@
+---
+- hosts: convergence_base
+  become: true
+  become_user: ocp
+
+  vars:
+    memcache_servers: ""
+    rabbit_transport_url: ""
+
+  tasks:
+  - name: Include variables
+    include_vars: vars/default.yaml
+
+  - name: check if common-config configmap already exist
+    shell: >
+      oc get configmap -n openstack | grep common-config
+    register: common_config_exist
+    args:
+      chdir: "{{ base_path }}"
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    ignore_errors: true
+
+  - name: delete common-config configmap (reinstall/rerun)
+    command: oc delete configmap common-config -n openstack
+    args:
+      chdir: "{{ base_path }}"
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    when: common_config_exist.rc == 0
+
+  - name: Include OSP variables
+    include_vars:
+      file: "vars/{{ item }}"
+      name: "{{ item | regex_replace('.yaml$', '') }}"
+    with_items:
+      - osp_inventory.yaml
+      - osp_global_vars.yaml
+      - osp_global_config_settings.yaml
+      - osp_controller
+
+  - name: create comon-config configmap
+    block:
+    - name: Create common-conf
+      file:
+        path: "{{ base_path }}/common-conf"
+        state: directory
+        mode: '0755'
+
+    - name: Add mappings to /etc/hosts
+      blockinfile:
+        path: "{{ base_path }}/common-conf/hosts"
+        create: yes
+        block: |
+          {{ osp_global_vars.hosts_entry }}
+
+    - name: create publicVip
+      shell: >
+        echo -n {{ osp_global_vars.net_vip_map.external }} > {{ base_path }}/common-conf/publicVip
+
+    - name: create internalAPIVip
+      shell: >
+        echo -n {{ osp_global_vars.net_vip_map.internal_api }} > {{ base_path }}/common-conf/internalAPIVip
+
+    - name: get list of controller internal_api_ip
+      set_fact:
+        osp_controller_internal_api_ips: "{{ osp_controller_internal_api_ips|default([]) }} + [ '{{ item.value.internal_api_ip }}' ]"
+      loop: "{{ osp_inventory.Controller.hosts|dict2items }}"
+
+    - name: create memcache server string
+      set_fact:
+        memcache_servers: "{{ memcache_servers }}{{ (memcache_servers|length > 0) | ternary(',', '', omit) }}{{ item }}:11211"
+      with_items:
+        - "{{ osp_controller_internal_api_ips }}"
+
+    - name: create memcacheServers
+      shell: >
+        echo -n {{ memcache_servers }} > {{ base_path }}/common-conf/memcacheServers
+
+    - name: create config map
+      command: "oc create configmap common-config --from-file={{ base_path }}/common-conf/ -n openstack"
+      args:
+        chdir: "{{ base_path }}"
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  - name: copy openstackclient-cm.yaml to {{ base_path }}
+    copy:
+      src: files/ocp/openstackclient-cm.yaml
+      dest: "{{ base_path }}/openstackclient-cm.yaml"
+      owner: ocp
+
+  - name: create openstackclient configMap
+    shell: >
+      oc apply -f {{ base_path }}/openstackclient-cm.yaml
+    args:
+      chdir: "{{ base_path }}"
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  - name: copy openstackclient-admin-secret.yaml to {{ base_path }}
+    copy:
+      src: files/ocp/openstackclient-admin-secret.yaml
+      dest: "{{ base_path }}/openstackclient-admin-secret.yaml"
+      owner: ocp
+
+  - name: create openstackclient admin user secret
+    shell: >
+      oc apply -f {{ base_path }}/openstackclient-admin-secret.yaml
+    args:
+      chdir: "{{ base_path }}"
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  - name: get list of controller internal_api_hostname
+    set_fact:
+      osp_controller_internal_api_hostnames: "{{ osp_controller_internal_api_hostnames|default([]) }} + [ '{{ item.value.internal_api_hostname }}' ]"
+    loop: "{{ osp_inventory.Controller.hosts|dict2items }}"
+
+  - name: create service secret
+    block:
+    - name: delete osp-secrets secret (reinstall/rerun)
+      command: oc delete secret osp-secrets -n openstack
+      args:
+        chdir: "{{ base_path }}"
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+      ignore_errors: true
+
+    - name: create rabbit_transport_url secret
+      block:
+      - set_fact:
+          rabbit_transport_url: "{{ rabbit_transport_url }}{{ (rabbit_transport_url|length > 0) | ternary(',', '', omit) }}guest:{{ osp_global_config_settings.oslo_messaging_rpc_password }}@{{ item }}:5672"
+        with_items:
+        - "{{ osp_controller_internal_api_hostnames }}"
+      - set_fact:
+          rabbit_transport_url: "rabbit://{{ rabbit_transport_url }}/?ssl=0"
+
+    - set_fact:
+        rabbit_transport_url: "{{ rabbit_transport_url | b64encode }}"
+        cinder_password: "{{ osp_controller.service_configs['cinder::keystone::auth::password'] | b64encode }}"
+        nova_password: "{{ osp_controller.service_configs['nova::keystone::auth::password'] | b64encode }}"
+        neutron_password: "{{ osp_controller.service_configs['neutron::keystone::auth::password'] | b64encode }}"
+        placement_password: "{{ osp_controller.service_configs['placement::keystone::auth::password'] | b64encode }}"
+
+    - name: create osp-secret.yaml secret from template
+      template:
+        src:  osp-secrets.yaml.j2
+        dest: "{{ base_path }}/osp-secrets.yaml"
+        mode: 0644
+
+    - name: create osp-service-secret secret
+      shell: >
+        oc apply -f {{ base_path }}/osp-secrets.yaml
+      args:
+        chdir: "{{ base_path }}"
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"

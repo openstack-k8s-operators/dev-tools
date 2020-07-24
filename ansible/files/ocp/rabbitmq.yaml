@@ -1,0 +1,153 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq
+data:
+  config.json: |
+    {
+        "command": "/usr/lib/rabbitmq/bin/rabbitmq-server",
+        "config_files": [
+            {
+                "source": "/var/lib/config-data/rabbitmq.config",
+                "dest": "/etc/rabbitmq/rabbitmq.config",
+                "owner": "rabbitmq",
+                "perm": "0600"
+            },
+            {
+                "source": "/var/lib/config-data/rabbitmq-env.conf",
+                "dest": "/etc/rabbitmq/rabbitmq-env.conf",
+                "owner": "rabbitmq",
+                "perm": "0600"
+            }
+        ],
+        "permissions": [
+            {
+                "path": "/var/lib/rabbitmq",
+                "owner": "rabbitmq:rabbitmq",
+                "recurse": "true"
+            }
+        ]
+    }
+  #inetrc: ""
+  rabbitmq.config: |
+    [
+      {rabbit, [
+        {loopback_users, []},
+        {tcp_listen_options, [
+             {keepalive,     true},
+             {backlog,       128},
+             {nodelay,       true},
+             {linger,        {true, 0}},
+             {exit_on_close, false}
+        ]},
+        {tcp_listeners, [{"0.0.0.0", 5672}]},
+        {log, [
+            {console, [{enabled, true},
+                       {level, info}
+            ]}
+        ]},
+        {collect_statistics_interval, 30000},
+        {cluster_partition_handling, ignore},
+        {queue_master_locator, <<"min-masters">>},
+        {default_user, <<"guest">>},
+        {default_pass, <<"yQ7ot2HdFDAG9q6VSim6a87VW">>}
+      ]},
+      {kernel, [
+        {inet_dist_listen_max, 25672},
+        {inet_dist_listen_min, 25672},
+        {net_ticktime, 15}
+      ]}
+    ,
+      {rabbitmq_management, [
+        {rates_mode, none}
+    ,    {listener, [
+          {ip, "127.0.0.1"},
+          {port, 15672}
+        ]}
+      ]}
+    ].
+  rabbitmq-env.conf: |
+    LANG=en_US.UTF-8
+    LC_ALL=en_US.UTF-8
+    NODE_IP_ADDRESS=
+    NODE_PORT=
+    RABBITMQ_NODENAME=rabbit@localhost
+    RABBITMQ_SERVER_ERL_ARGS='+K true +P 1048576 -kernel inet_default_connect_options [{nodelay,true}]'
+    RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS='+sbwt none'
+    #export ERL_INETRC=/etc/rabbitmq/inetrc
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rabbitmq
+  labels:
+    app: openstack-rabbitmq
+spec:
+  containers:
+  - name: rabbitmq
+    image: docker.io/tripleomaster/centos-binary-rabbitmq:current-tripleo
+    #user: root
+    #command: ['/bin/sleep', '720']
+    volumeMounts:
+    - mountPath: /var/lib/config-data
+      readOnly: true
+      name: config-data
+    - mountPath: /var/lib/kolla/config_files
+      readOnly: true
+      name: kolla-config
+    - mountPath: /var/lib/rabbitmq
+      name: lib-data
+    env:
+    - name: KOLLA_CONFIG_STRATEGY
+      value: COPY_ALWAYS
+  volumes:
+  - name: kolla-config
+    configMap:
+      name: rabbitmq
+      items:
+        - key: config.json
+          path: config.json
+  - name: config-data
+    configMap:
+      name: rabbitmq
+      items:
+        - key: rabbitmq.config
+          path: rabbitmq.config
+        - key: rabbitmq-env.conf
+          path: rabbitmq-env.conf
+  - name: lib-data
+    persistentVolumeClaim:
+      claimName: rabbitmq
+  initContainers:
+  - name: rabbitmq-init
+    image: docker.io/tripleomaster/centos-binary-rabbitmq:current-tripleo
+    #user: root
+    #command: ['/bin/sleep', '720']
+    volumeMounts:
+    - mountPath: /var/lib/config-data
+      readOnly: true
+      name: config-data
+    - mountPath: /var/lib/kolla/config_files
+      readOnly: true
+      name: kolla-config
+    - mountPath: /var/lib/rabbitmq
+      name: lib-data
+    env:
+    - name: KOLLA_CONFIG_STRATEGY
+      value: COPY_ALWAYS
+    - name: KOLLA_BOOTSTRAP
+      value: 'true'
+    - name: RABBITMQ_CLUSTER_COOKIE
+      value: foobar123
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openstack-rabbitmq
+spec:
+  selector:
+    app: openstack-rabbitmq
+  ports:
+    - protocol: TCP
+      port: 5672
+      targetPort: 5672

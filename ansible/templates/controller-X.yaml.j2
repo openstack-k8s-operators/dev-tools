@@ -1,0 +1,48 @@
+apiVersion: kubevirt.io/v1alpha3
+kind: VirtualMachine
+metadata:
+  labels:
+    special: controller-{{ item }}
+  name: controller-{{ item }}
+spec:
+  running: true
+  template:
+    spec:
+      nodeSelector:
+        vmi: controller-{{ item }}
+      domain:
+        devices:
+          disks:
+          - disk:
+              bus: virtio
+            name: controller-{{ item }}-pvc
+          interfaces:
+            - bridge: {}
+              name: default
+            - bridge: {}
+              name: ctlplane
+              macAddress: {{ osp_controller_mac_address }}
+        machine:
+          type: ""
+        memory:
+          guest: 16384M
+        cpu:
+          cores: 4
+        resources:
+          requests:
+            memory: 12288M
+            cpu: 2
+          overcommitGuestOverhead: true
+      terminationGracePeriodSeconds: 0
+      networks:
+      - name: default
+        pod: {}
+      - multus:
+          networkName: ctlplane
+        name: ctlplane
+      volumes:
+      - persistentVolumeClaim:
+          claimName: controller-{{ item }}-pvc
+        name: controller-{{ item }}-pvc
+status: {}
+

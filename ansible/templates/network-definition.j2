@@ -1,0 +1,11 @@
+{
+    "spec": {
+        "additionalNetworks": [
+            {
+                "name": "ctlplane",
+                "rawCNIConfig": "{ \"cniVersion\": \"0.3.1\", \"type\": \"host-device\", \"device\": \"{{ ocp_osp_host_interface }}\"}",
+                "type": "Raw"
+            }
+        ]
+    }
+}

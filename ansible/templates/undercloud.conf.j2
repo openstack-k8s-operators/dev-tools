@@ -1,0 +1,24 @@
+[DEFAULT]
+# Network interface on the Undercloud that will be handling the PXE
+# boots and DHCP for Overcloud instances. (string value)
+local_interface = enp2s0
+local_ip = 192.168.25.5/24
+undercloud_public_host = 192.168.25.2
+undercloud_admin_host = 192.168.25.3
+undercloud_nameservers = 192.168.25.1
+undercloud_ntp_servers=clock1.rdu2.redhat.com
+overcloud_domain_name= {{ ocp_cluster_name }}
+container_images_file=/home/stack/containers-prepare-parameter.yaml
+container_insecure_registries=rhos-qe-mirror-rdu2.usersys.redhat.com:5002,docker-registry.upshift.redhat.com,registry.access.redhat.com,registry-proxy.engineering.redhat.com
+undercloud_timezone = UTC
+#undercloud_service_certificate = /etc/pki/instack-certs/undercloud.pem
+#hieradata_override = /home/stack/hiera_override.yaml
+
+[ctlplane-subnet]
+local_subnet = ctlplane-subnet
+cidr = 192.168.25.0/24
+dhcp_start = 192.168.25.50
+dhcp_end = 192.168.25.90
+gateway = 192.168.25.1
+inspection_iprange = 192.168.25.100,192.168.25.120
+masquerade = true

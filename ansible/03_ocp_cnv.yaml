@@ -1,0 +1,74 @@
+---
+- hosts: convergence_base
+  become: true
+  become_user: ocp
+
+  tasks:
+  - name: Include variables
+    include_vars: vars/default.yaml
+
+  - name: install kubevirt
+    block:
+    - name: create working dir for rendered templates
+      file:
+        path: "{{ base_path }}/cnv"
+        state: directory
+        mode: '0755'
+
+    - name: download deploy_marketplace.sh
+      get_url:
+        url: "https://raw.githubusercontent.com/kubevirt/hyperconverged-cluster-operator/master/deploy/{{ item }}"
+        dest: "{{ base_path }}/cnv/{{ item }}"
+        mode: '0755'
+      with_items:
+        - cleanup_marketplace.sh
+        - deploy_marketplace.sh
+
+    - name: cleanup previous cnv installs
+      shell: >
+        {{ base_path }}/cnv/cleanup_marketplace.sh
+      args:
+        chdir: "{{ base_path }}"
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+        APP_REGISTRY: "redhat-operators"
+        TARGET_NAMESPACE: "openshift-cnv"
+        HCO_VERSION: 2.2.0
+        HCO_CHANNEL: 2.2
+      ignore_errors: true
+
+    - name: install cnv
+      shell: >
+        {{ base_path }}/cnv/deploy_marketplace.sh
+      args:
+        chdir: "{{ base_path }}"
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+        APP_REGISTRY: "redhat-operators"
+        TARGET_NAMESPACE: "openshift-cnv"
+        HCO_VERSION: 2.2.0
+        HCO_CHANNEL: 2.2
+
+    - name: enable cnv-2.2-for-rhel-8-x86_64-rpms to install kubevirt-virtctl
+      become: true
+      become_user: root
+      command: subscription-manager repos --enable=cnv-2.2-for-rhel-8-x86_64-rpms
+
+    - name: Install kubevirt-virtctl package
+      become: true
+      become_user: root
+      package:
+        name:  kubevirt-virtctl
+        state: installed
+
+  - name: To access the OCP web console
+    debug:
+      msg:
+        - "1) add the following line to your local /etc/hosts:"
+        - "   192.168.111.4   console-openshift-console.apps.{{ ocp_cluster_name }}.test.metalkube.org console openshift-authentication-openshift-authentication.apps.{{ ocp_cluster_name }}.test.metalkube.org api.{{ ocp_cluster_name }}.test.metalkube.org prometheus-k8s-openshift-monitoring.apps.{{ ocp_cluster_name }}.test.metalkube.org alertmanager-main-openshift-monitoring.apps.{{ ocp_cluster_name }}.test.metalkube.org kubevirt-web-ui.apps.{{ ocp_cluster_name }}.test.metalkube.org oauth-openshift.apps.{{ ocp_cluster_name }}.test.metalkube.org grafana-openshift-monitoring.apps.{{ ocp_cluster_name }}.test.metalkube.org"
+        - "2) run on your local system:"
+        - "   sshuttle -r <user>@{{ ansible_fqdn }} 192.168.111.0/24"
+        - "3) access:"
+        - "   https://console-openshift-console.apps.{{ ocp_cluster_name }}.test.metalkube.org"

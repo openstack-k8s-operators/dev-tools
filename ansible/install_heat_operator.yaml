@@ -1,0 +1,91 @@
+---
+- hosts: convergence_base
+  become: true
+  become_user: ocp
+
+  vars:
+    memcache_servers: ""
+    rabbit_transport_url: ""
+
+  tasks:
+  - name: Include variables
+    include_vars: vars/default.yaml
+
+  - name: Create {{ base_path }}/github.com/openstack-k8s-operators
+    file:
+      path: "{{ base_path }}/github.com/openstack-k8s-operators/heat-operator"
+      state: directory
+      mode: '0755'
+
+  - name: Clone openstack-k8s-operators with force=yes to be able to rerun
+    git:
+      repo: "{{ openstack_k8s_operators_https_url | default('https://github.com/openstack-k8s-operators', true) }}/{{ item }}.git"
+      dest: "{{ base_path }}/github.com/openstack-k8s-operators/{{ item }}"
+      version: "{{ openstack_k8s_operators_heat_branch | default('HEAD', true) }}"
+      force: yes
+    with_items:
+      - heat-operator
+
+  - name: delete heat-operator resources if they exist
+    shell: |
+      oc delete -f {{ base_path }}/github.com/openstack-k8s-operators/heat-operator/deploy/{{ item }}
+    args:
+      chdir: "{{ base_path }}"
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    ignore_errors: true
+    loop:
+      - operator.yaml
+      - crds/heat.openstack.org_v1_heat_cr.yaml
+      - crds/heat.openstack.org_heats_crd.yaml
+      - service_account.yaml
+      - role_binding.yaml
+      - role.yaml
+
+  - name: delete heat-operator deployment if operator already deployed
+    shell: |
+      if oc get deployments/heat-operator; then
+        oc delete deployments/heat-operator
+      fi
+      if oc get deployments/heat-api; then
+        oc delete deployments/heat-api
+      fi
+      if oc get deployments/heat-engine; then
+        oc delete deployments/heat-engine
+      fi
+    args:
+      chdir: "{{ base_path }}"
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    ignore_errors: true
+
+  - name: make sure mariadb pod is Running
+    shell: |
+      oc get pods mariadb -o json | jq .status.phase -r
+    register: mariadb_out
+    retries: 30
+    delay: 2
+    until: mariadb_out.stdout == "Running"
+    args:
+      chdir: "{{ base_path }}"
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  - name: create heat operator resources
+    shell: |
+      oc create -f {{ base_path }}/github.com/openstack-k8s-operators/heat-operator/deploy/{{ item }}
+    args:
+      chdir: "{{ base_path }}"
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    loop:
+      - role.yaml
+      - role_binding.yaml
+      - service_account.yaml
+      - crds/heat.openstack.org_heats_crd.yaml
+      - operator.yaml
+      - crds/heat.openstack.org_v1_heat_cr.yaml

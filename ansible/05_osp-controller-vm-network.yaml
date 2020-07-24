@@ -1,0 +1,120 @@
+---
+- hosts: convergence_base
+  become: true
+  become_user: root
+
+  tasks:
+  - name: Include variables
+    include_vars: vars/default.yaml
+
+  - name: check if ctlplane network already exists
+    shell: >
+      virsh net-list | grep ctlplane
+    ignore_errors: true
+    register: ctlplane_exist
+
+  - name: create ctlplane network
+    when: ctlplane_exist.rc == 1
+    block:
+    - name: copy ctlpane network definition
+      copy:
+        src:  "ctlplane.xml"
+        dest: "{{ base_path }}/"
+        mode: 0644
+
+    - name: Define ctlplane libvirt network
+      command: "virsh net-define {{ base_path }}/ctlplane.xml"
+
+    - name: Start the ctlplane network
+      shell: |
+        virsh net-start --network ctlplane
+        virsh net-autostart --network ctlplane
+
+  - name: check if worker nodes are already configured as ip-dhcp-host
+    shell: >
+      virsh net-dumpxml ctlplane | grep '00:14:cd:2b:c8:0'
+    ignore_errors: true
+    register: ctlplane_worker_exist
+
+  - name: register workers in ctlplane network
+    when: ctlplane_worker_exist.rc == 1
+    block:
+    - name: Add worker hosts to ctlplane network
+      command: "virsh net-update ctlplane add ip-dhcp-host --xml \"<host mac='{{ '00:14:cd:2b:c8:0%01x' | format(item) }}' ip='{{ '192.168.25.2%01x' | format(item) }}'/>\" --live --config"
+      loop: "{{ range(0, ocp_num_workers , 1)|list }}"
+
+  - name: Detach ctlplane network interface from the OpenShift worker VM's if this is a rerun of the playbook
+    command: "virsh detach-interface {{ ocp_cluster_name }}{{ '_worker_%01x' | format(item) }} bridge --mac {{ '00:14:cd:2b:c8:0%01x' | format(item) }} --persistent --live"
+    loop: "{{ range(0, ocp_num_workers , 1)|list }}"
+    ignore_errors: true
+
+  - name: Attach the ctlplane network to each of the OpenShift worker VM's
+    command: "virsh attach-interface {{ ocp_cluster_name }}{{ '_worker_%01x' | format(item) }} bridge ctlplane --mac {{ '00:14:cd:2b:c8:0%01x' | format(item) }} --model virtio --persistent --live"
+    loop: "{{ range(0, ocp_num_workers , 1)|list }}"
+
+  - name: get vm ip details
+    shell: >
+      echo $(virsh net-dhcp-leases {{ ocp_cluster_name }}bm | egrep 'worker' | awk '{gsub(/\/24/,"");gsub(/-/,"_");print "{{ ocp_cluster_name }}_"$6":"$5}')
+    register: virsh_vms
+
+  - name: set vms fact
+    set_fact:
+      ocp_nodes: >
+        {{ ocp_nodes | default({}) | combine ( { item.split(':')[0]: item.split(':')[1] } ) }}
+    with_items: "{{virsh_vms.stdout_lines[0].split(' ')}}"
+
+  - name: add nodes to inventory
+    add_host:
+      hostname: '{{ item.value }}'
+      groups: ocp_nodes
+    loop: "{{ lookup('dict', ocp_nodes) }}"
+
+  - debug:
+      msg: |
+        {{ groups.ocp_nodes | to_nice_json }}
+
+  - name: interface should be automatically up, but lets make sure the interface is up
+    become_user: ocp
+    command: "ssh -o StrictHostKeyChecking=no core@{{ item }} 'sudo nmcli  device connect {{ ocp_osp_host_interface }}'"
+    with_items:
+      - "{{ groups.ocp_nodes }}"
+
+  - name: create additionalNetworks snippet
+    become_user: ocp
+    template:
+      src: network-definition.j2
+      dest: "{{ base_path }}/additionalNetworks.json"
+      mode: 0644
+
+  - name: get current live cluster networks.operator.openshift.io
+    become_user: ocp
+    command: oc get networks.operator.openshift.io cluster -o json
+    register: cluster_networks
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  - name: write output to file
+    copy:
+      content={{cluster_networks.stdout }}
+      dest={{ base_path }}/cluster_networks.json
+
+  - name: add additionalNetworks to cluster_networks
+    shell: >
+      cat {{ base_path }}/cluster_networks.json {{ base_path }}/additionalNetworks.json | jq -s add | oc apply -f -
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  - pause:
+      seconds: 5
+
+  - name: check network-attachment-definitions
+    command: oc get network-attachment-definitions
+    register: network_attachment_definitions
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  - debug:
+      msg: "{{ network_attachment_definitions.stdout.split('\n') }}"

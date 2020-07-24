@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tripleo-deploy
+spec:
+  parallelism: 1
+  completions: 1
+  activeDeadlineSeconds: 7200
+  backoffLimit: 1
+  template:
+    metadata:
+      name: tripleo-deploy
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: {{ tripleo_deploy_job_worker }}
+      containers:
+      - name: tripleo-deploy
+        image: quay.io/openstack-k8s-operators/tripleo-deploy
+        securityContext:
+          privileged: true
+        command:
+          - bash
+          - /scripts/tripleo-deploy.sh
+        volumeMounts:
+          - name: tripleo-deploy-config
+            mountPath: /config
+            readOnly: true
+          - name: tripleo-deploy-sh-config
+            mountPath: /scripts
+          - name: overcloud-ssh-key
+            mountPath: /root/.ssh
+          - name: tripleo-deploy-volume
+            mountPath: /root/tripleo-deploy
+      volumes:
+        - name: tripleo-deploy-config
+          configMap:
+            name: tripleo-deploy-config
+        - name: tripleo-deploy-sh-config
+          configMap:
+            name: tripleo-deploy-sh-config
+        - name: overcloud-ssh-key
+          secret:
+            secretName: overcloud-ssh-key
+            defaultMode: 0600
+            items:
+              - key: ssh-privatekey
+                path: id_rsa
+              - key: ssh-publickey
+                path: id_rsa.pub
+        - name: tripleo-deploy-volume
+          hostPath:
+            path: /tmp
+            type: Directory
+      restartPolicy: Never
