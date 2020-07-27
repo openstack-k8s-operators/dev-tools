@@ -1,0 +1,33 @@
+# This role only works correctly on localhost due to the use of fetch
+# It creates ~/ostest-working initially containing kubeconfig, and put oc in
+# ~/.local/bin/
+
+# Also used indirectly by default variables
+- name: Include variables
+  include_vars: vars/default.yaml
+
+# We use mkdir instead of file below because the local shell always expands ~
+# correctly locally, and doesn't try to change the permissions on the local
+# directory to the remote user
+
+- name: Ensure local directories exist
+  shell: |
+    mkdir -p {{ local_working_dir }}
+    (cd {{ local_working_dir }}; pwd)
+    mkdir -p {{ local_bin_dir }}
+    (cd {{ local_bin_dir }}; pwd)
+  register: local_dirs
+  become: false
+  connection: local
+
+- name: Copy kubeconfig
+  fetch:
+    dest: "{{ local_dirs.stdout_lines[0] }}/"
+    src: "{{ base_path }}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    flat: true
+
+- name: Copy oc binary
+  fetch:
+    dest: "{{ local_dirs.stdout_lines[1] }}/"
+    src: "/usr/local/bin/oc"
+    flat: true
