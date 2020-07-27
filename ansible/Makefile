@@ -5,19 +5,13 @@
 default: \
   ocp_install \
   olm \
-  osp_controller_prepare \
-  osp_controller_install  \
-  osp_operators_install \
-  osp_tests_run
+  #osp_operators_install \
+  #osp_tests_run
 
 all: default
 
 local-deps:
 	ansible-galaxy install -r requirements.yml
-
-demo:
-	ANSIBLE_FORCE_COLOR=true ansible-playbook \
-	demo_playbook.yaml
 
 ocp_install: local-deps
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
@@ -26,20 +20,6 @@ ocp_install: local-deps
 	02_local-nfs-server.yaml \
 	03_ocp_dev_scripts.yaml \
 	ocp_image_registry.yaml \
-
-osp_controller_prepare:
-	ANSIBLE_FORCE_COLOR=true ansible-playbook \
-	-i hosts \
-	03_ocp_cnv.yaml \
-	04_osp-controller-vm-storage.yaml \
-	05_osp-controller-vm-network.yaml \
-	06_osp-create-controller-vms.yaml \
-
-osp_controller_install:
-	ANSIBLE_FORCE_COLOR=true ansible-playbook \
-	-i hosts \
-	07_osp_tripleo_deploy.yaml \
-	09_create_common-config.yaml \
 
 osp_operators_install:
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
@@ -69,15 +49,6 @@ make olm_cleanup:
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-v -i hosts \
 	olm_cleanup.yaml
-
-ocp_controller_cleanup:
-	for i in `seq 0 2`; do su - ocp -c "cd; \
-          export KUBECONFIG=dev-scripts/ocp/ostest/auth/kubeconfig; \
-          oc delete -f cnv/controller-$$i.yaml; \
-          oc delete -f cnv/controller-$$i-sc.yaml; \
-          oc delete -f cnv/controller-$$i-pvc.yaml; \
-          oc delete -f cnv/controller-$$i-pv.yaml"; \
-        done
 
 # XXX: WARNING!!! WARNING!!! DANGER WILL ROBINSON!!!
 # YOU PROBABLY SHOULD NOT EXECUTE ANY OF THE FOLLOWING!

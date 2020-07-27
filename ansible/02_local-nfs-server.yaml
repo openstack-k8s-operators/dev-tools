@@ -29,25 +29,6 @@
       path: /etc/exports
       line: '/home/nfs *(rw,sync,no_root_squash)'
 
-  - name: Create glance NFS share
-    file:
-      path: "/home/nfs/{{ item }}"
-      state: directory
-      mode: '777'
-      group: nobody
-      owner: nobody
-    with_items:
-      - glance
-      - glance-staging
-
-  - name: Configure glance export
-    lineinfile:
-      path: /etc/exports
-      line: "/home/nfs/{{ item }} *(rw,sync,no_root_squash)"
-    with_items:
-      - glance
-      - glance-staging
-
   - name: Export NFS share to the server
     command: "exportfs -r"
 

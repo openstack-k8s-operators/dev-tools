@@ -20,28 +20,9 @@
       mode: 0755
       remote_src: yes
 
-  - block:
-    - name: Get the OCP version to be used
-      import_role:
-        name: get_cnv_tested_ocp_version
-
-# NOTE(mdbooth): The following block looks redundant to me, as the
-# get_cnv_tested_ocp_version will always set ocp_release_image, and therefore
-# ocp_release_info will never be used. I've left it commented out in case it
-# needs to be restored for some reason I missed.
-
-#    - name: get latest OCP image for ocp_release
-#      uri:
-#        url: "https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/{{ ocp_release | default('4.4', true) }}.0-0.ci/latest"
-#        return_content: yes
-#      register: ocp_release_info
-#  
-#    - set_fact:
-#        ocp_release_info_content: "{{ ocp_release_info.content|from_json }}"
-#  
-#    - set_fact:
-#        ocp_release_image_real: "{{ ocp_release_image if ocp_release_image is defined else ocp_release_info_content['pullSpec'] }}"
-
+  - name: Get the OCP version to be used
+    import_role:
+      name: get_cnv_tested_ocp_version
     when: ocp_release_image is not defined
 
   - name: set OCP release to use
@@ -100,7 +81,7 @@
       regexp: '^export IP_STACK='
       line: export IP_STACK='{{ ocp_ip_stack }}'
 
-  - name: set CLUSTER_NAME in {{ base_path }}/dev-scripts/config_osp_cnv.sh
+  - name: set CLUSTER_NAME in {{ base_path }}/dev-scripts/config_$USER.sh
     lineinfile:
       path: "{{ base_path }}/dev-scripts/config_$USER.sh"
       regexp: '^export CLUSTER_NAME='

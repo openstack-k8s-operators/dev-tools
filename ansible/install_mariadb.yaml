@@ -63,9 +63,6 @@
   - name: create mariadb pod
     become_user: ocp
     shell: |
-      if oc get pods mariadb; then
-        oc delete pods tripleo-deploy-config
-      fi
       oc create -f mariadb.yaml
     args:
       chdir: "{{ base_path }}"

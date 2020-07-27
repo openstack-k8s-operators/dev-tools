@@ -7,8 +7,6 @@ spec:
   metadata:
     labels:
       app: tempest
-  nodeSelector:
-    kubernetes.io/hostname: {{ openstackclient_pod_worker }}
   restartPolicy: Never
   initContainers:
     - name: tempest-run
