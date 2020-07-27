@@ -1,0 +1,24 @@
+---
+- hosts: convergence_base
+  gather_facts: false
+  become: true
+  user: root
+  any_errors_fatal: true
+  vars:
+    pvs:
+    - size: 4
+      number: 16
+    - size: 128
+      number: 8
+    - size: 128
+      number: 4
+      shared: true
+
+  tasks:
+  - name: Create PVs
+    include_tasks: create_nfs_export.yaml
+    vars:
+      exports: "{{ pvs | expand_pvs | list }}"
+      group: host-nfs-storageclass
+      storageclass_create: true
+      storageclass_isdefault: true

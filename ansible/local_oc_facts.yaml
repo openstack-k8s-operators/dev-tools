@@ -1,0 +1,11 @@
+- name: Include variables
+  include_vars: vars/default.yaml
+
+- name: Get local oc facts
+  shell: |
+    (cd {{ local_working_dir }}; pwd)
+  register: working_dir_out
+
+- set_fact:
+    working_dir: "{{ working_dir_out.stdout_lines[0] }}"
+    kubeconfig: "{{ working_dir_out.stdout_lines[0] }}/kubeconfig"

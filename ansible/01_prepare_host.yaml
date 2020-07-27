@@ -262,3 +262,7 @@
       path: /home/ocp
       state: directory
       mode: '0755'
+
+  - name: Configure NFS server
+    import_role:
+      name: nfs_server
