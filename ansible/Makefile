@@ -56,14 +56,10 @@ make olm_cleanup:
 # Unlike the ansible playbooks, the following all assume you're executing this
 # directly on the host.
 
-clean: ocp_cleanup ctlplane_cleanup host_cleanup
+clean: ocp_cleanup host_cleanup
 
 host_cleanup:
 	-echo | sudo tee /etc/exports
 
 ocp_cleanup:
 	-sudo su - ocp -c "cd dev-scripts && make clean"
-
-ctlplane_cleanup:
-	-sudo virsh net-destroy ctlplane
-	-sudo virsh net-undefine ctlplane
