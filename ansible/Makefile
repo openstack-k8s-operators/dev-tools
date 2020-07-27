@@ -1,7 +1,3 @@
-# To set a specific release to install, add the argument:
-#   -e ocp_release_image=quay.io/openshift-release-dev/ocp-release:4.5.3-x86_64
-# TODO: parameterise the above
-
 default: \
   ocp_install \
   olm \
