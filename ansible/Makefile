@@ -38,7 +38,7 @@ podified-ctlplane:
 	install_mariadb.yaml \
 	install_rabbitmq.yaml \
 	install_keystone.yaml \
-	install_heat_operator.yaml
+	install_heat.yaml
 
 olm:
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
