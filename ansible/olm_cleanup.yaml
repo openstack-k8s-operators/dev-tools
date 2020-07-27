@@ -2,18 +2,26 @@
 - hosts: convergence_base
   become: true
   become_user: ocp
+  vars_files: "vars/default.yaml"
+  environment:
+    PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+    KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
 
   tasks:
   - name: Include variables
     include_vars: vars/default.yaml
+
+  - name: switch to openstack project/namespace
+    ignore_errors: true
+    shell: >
+      oc project openstack
+    register: openstack_project_switch
 
   - name: olm cleanup
     command: "{{ item }}"
     args:
       chdir: "{{ base_path }}"
     environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
       CSV_VERSION: "{{csv_version}}"
     ignore_errors: true
     with_items:
