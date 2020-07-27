@@ -1,0 +1,74 @@
+---
+- hosts: convergence_base
+  become: true
+
+  tasks:
+  - name: Include variables
+    include_vars: vars/default.yaml
+    tags:
+      - always
+
+  - name: render {{ base_path }}/mariadb-storage.yaml
+    template:
+      src: mariadb-storage.yaml.j2
+      dest: "{{ base_path }}/mariadb-storage.yaml"
+      owner: ocp
+
+  - name: create mariadb storage
+    become_user: ocp
+    shell: |
+      # need to delete the pod before the pvc
+      if oc get pods mariadb; then
+        oc delete pods mariadb
+      fi
+      if oc get pvc mariadb; then
+        oc delete pvc mariadb
+      fi
+      if oc get pv mariadb; then
+        oc delete pv mariadb
+      fi
+      if oc get storageclass local-storage; then
+        oc delete storageclass local-storage
+      fi
+      if oc get configmap mariadb; then
+        oc delete configmap mariadb
+      fi
+      if oc get service openstack-db-mariadb; then
+        oc delete service openstack-db-mariadb
+      fi
+      oc create -f {{ base_path }}/mariadb-storage.yaml
+    args:
+      chdir: "{{ base_path }}"
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  - name: create /var/lib/mysql on {{ mariadb_storage_worker }}
+    become_user: ocp
+    shell: |
+      oc debug nodes/{{ mariadb_storage_worker }} -- rm -rf /host/var/lib/mysql
+      oc debug nodes/{{ mariadb_storage_worker }} -- mkdir -p /host/var/lib/mysql
+    args:
+      chdir: "{{ base_path }}"
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  - name: copy mariadb.yaml to {{ base_path }}
+    copy:
+      src: files/ocp/mariadb.yaml
+      dest: "{{ base_path }}/mariadb.yaml"
+      owner: ocp
+
+  - name: create mariadb pod
+    become_user: ocp
+    shell: |
+      if oc get pods mariadb; then
+        oc delete pods tripleo-deploy-config
+      fi
+      oc create -f mariadb.yaml
+    args:
+      chdir: "{{ base_path }}"
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"

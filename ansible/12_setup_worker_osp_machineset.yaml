@@ -1,0 +1,108 @@
+---
+- hosts: convergence_base
+  become: true
+  become_user: root
+
+  tasks:
+  - name: Include variables
+    include_vars: vars/default.yaml
+
+  - name: Create {{ base_path }}/github.com/openstack-k8s-operators
+    file:
+      path: "{{ base_path }}/github.com/openstack-k8s-operators/compute-node-operator"
+      state: directory
+      mode: '0755'
+
+  - name: Clone openstack-k8s-operators with force=yes to be able to rerun
+    git:
+      repo: "{{ openstack_k8s_operators_https_url | default('https://github.com/openstack-k8s-operators', true) }}/{{ item }}.git"
+      dest: "{{ base_path }}/github.com/openstack-k8s-operators/{{ item }}"
+      version: "{{ openstack_k8s_operators_nova_branch | default('HEAD', true) }}"
+      force: yes
+    with_items:
+      - compute-node-operator
+
+  - name: install compute-node-operator
+    block:
+    - name: create working dir for rendered templates
+      file:
+        path: "{{ base_path }}/compute-node-operator"
+        state: directory
+        mode: '0755'
+
+    - name: wait for operator to be installed
+      shell: >
+        oc get pods -n openstack | grep compute-node-operator | grep Running
+      args:
+        chdir: "{{ base_path }}"
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+      register: cmd_res
+      retries: 10
+      delay: 2
+      until: cmd_res.rc == 0
+
+  - name: install compute cr's
+    command: oc apply -f "{{ item }}"
+    args:
+      chdir: "{{ base_path }}"
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    with_fileglob:
+      - "{{ base_path }}/github.com/openstack-k8s-operators/compute-node-operator/deploy/crds/*_cr.yaml"
+
+  - name: set deletePolicy=Newest on existing worker machineset for predictable scale down
+    become_user: ocp
+    shell: >
+      oc get machineset/ostest-worker-0 -n openshift-machine-api -o json | jq '.spec.deletePolicy="Newest"' | oc apply -f -
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  - name: scale OSP compute workers
+    when: osp_compute_scale > 0
+    block:
+    - name: get current {{ ocp_cluster_name }}-worker-0 replicas
+      become_user: ocp
+      shell: >
+        oc -n openshift-machine-api get machineset {{ ocp_cluster_name }}-worker-0 -o json | jq -r .status.replicas
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+      register: worker_replicas
+
+    - name: set fact of new replicas count
+      set_fact:
+        replicas: "{{ worker_replicas.stdout|int - osp_compute_scale|int }}"
+
+    - name: scale down worker machineset by {{ replicas }}
+      become_user: ocp
+      shell: >
+        oc -n openshift-machine-api scale machineset {{ ocp_cluster_name }}-worker-0 --replicas={{ replicas }}
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+    - name: scale up osp worker nodes by {{ osp_compute_scale }}
+      become_user: ocp
+      shell: |
+        oc patch computenodeopenstacks.compute-node.openstack.org -n openstack example-computenodeopenstack -p '{"spec":{"workers": {{ osp_compute_scale }} }}' --type=merge
+      args:
+        chdir: "{{ base_path }}"
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+    - name: wait until worker-osp got provisioned
+      become_user: ocp
+      shell: >
+        echo $(oc get nodes --selector='node-role.kubernetes.io/worker-osp' | grep Ready | wc -l)
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+      register: worker_osp_ready
+      until: worker_osp_ready.stdout|int == osp_compute_scale|int
+      delay: 30
+      retries: 60

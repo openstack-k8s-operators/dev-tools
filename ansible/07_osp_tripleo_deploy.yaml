@@ -1,0 +1,227 @@
+---
+- hosts: convergence_base
+  become: true
+
+  tasks:
+  - name: Include variables
+    include_vars: vars/default.yaml
+    tags:
+      - always
+
+  - name: allow traffic between ostestbm and ctlplane for tripleo_deploy container
+    iptables:
+      chain: FORWARD
+      source: 192.168.111.0/24
+      destination: 192.168.25.0/24
+      jump: ACCEPT
+      action: insert
+      rule_num: 1
+
+  - name: render {{ base_path }}/tripleo-deploy-configmap.yaml
+    template:
+      src: tripleo-deploy-configmap.yaml.j2
+      dest: "{{ base_path }}/tripleo-deploy-configmap.yaml"
+      owner: ocp
+    tags:
+      - tripleo_deploy_setup
+    vars:
+      - nfs_server: '192.168.25.1'
+
+  - name: render {{ base_path }}/tripleo-deploy-job.yaml
+    template:
+      src: tripleo-deploy-job.yaml.j2
+      dest: "{{ base_path }}/tripleo-deploy-job.yaml"
+      owner: ocp
+    tags:
+      - tripleo_deploy_setup
+
+  - name: copy tripleo-deploy.sh to {{ base_path }}
+    copy:
+      src: files/osp/tripleo-deploy.sh
+      dest: "{{ base_path }}/tripleo-deploy.sh"
+      owner: ocp
+    tags:
+      - tripleo_deploy_setup
+
+  - name: create tripleo-deploy-config ConfigMap
+    become_user: ocp
+    shell: |
+      if oc get configmap tripleo-deploy-config; then
+        oc delete configmap tripleo-deploy-config
+      fi
+      oc apply -f {{ base_path }}/tripleo-deploy-configmap.yaml
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    tags:
+      - tripleo_deploy_setup
+
+  - name: create tripleo-deploy.sh ConfigMap
+    become_user: ocp
+    shell: |
+      if oc get configmap tripleo-deploy-sh-config; then
+        oc delete configmap tripleo-deploy-sh-config
+      fi
+      oc create configmap tripleo-deploy-sh-config --from-file {{ base_path}}/tripleo-deploy.sh
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    tags:
+      - tripleo_deploy_setup
+
+  - name: create secret for overcloud ssh key
+    become_user: ocp
+    shell: |
+      if oc get secret overcloud-ssh-key; then
+        oc delete secret overcloud-ssh-key
+      fi
+      oc create secret generic overcloud-ssh-key --from-file=ssh-privatekey=$(realpath {{ converged_ssh_key }}) --from-file=ssh-publickey=$(realpath {{ converged_ssh_key ~ '.pub' }})
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    tags:
+      - tripleo_deploy_setup
+
+  - name: start tripleo deploy job
+    become_user: ocp
+    shell: |
+      if oc get job tripleo-deploy; then
+        oc delete job tripleo-deploy
+      fi
+      oc apply -f {{ base_path }}/tripleo-deploy-job.yaml
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    tags:
+      - tripleo_deploy_job
+
+  - name: wait up to 100m for tripleo deploy job
+    become_user: ocp
+    shell: |
+      oc get job tripleo-deploy -o json | jq .status.active
+    register: status
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    until: (status.stdout == 0 or status.stdout == "null")
+    retries: 600
+    delay: 10
+    tags:
+      - tripleo_deploy_job
+
+  - name: check result of tripleo deploy job
+    become_user: ocp
+    shell: |
+      oc get job tripleo-deploy -o json | jq .status.succeeded
+    register: result
+    failed_when: result.stdout != "1"
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    tags:
+      - tripleo_deploy_job
+
+  - name: get global_vars.yaml/etc from tripleo-deploy pod for input for operator deployment
+    shell: |
+      oc debug node/{{ tripleo_deploy_job_worker }} << EOF > {{ playbook_dir }}/vars/osp_{{ item | basename | lower }}
+      cat /host/tmp/cnv-ansible/{{ item }}
+      EOF
+    with_items:
+      - inventory.yaml
+      - global_vars.yaml
+      - Controller/global_config_settings.yaml
+      - group_vars/Controller
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    tags:
+      - tripleo-deploy-output
+
+  - name: get clouds.yaml from tripleo-deploy.pod for input for openstackclient pod
+    shell: |
+      oc debug node/{{ tripleo_deploy_job_worker }} << EOF > /tmp/clouds.yaml
+      cat /host/tmp/clouds.yaml
+      EOF
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    tags:
+      - tripleo-deploy-output
+      - openstackclient
+
+- hosts: convergence_base
+  user: root
+  become: true
+
+  tasks:
+  - name: Include variables
+    include_vars: vars/default.yaml
+    tags:
+      - always
+
+  - name: ensure {{ base_path }}/.config/openstack directory exists
+    file:
+      state: directory
+      path: "{{ base_path }}/.config/openstack"
+    tags:
+      - openstackclient
+
+  - name: move clouds.yaml to {{ base_path }}
+    copy:
+      remote_src: False
+      src: /tmp/clouds.yaml
+      dest: "{{ base_path }}/.config/openstack/clouds.yaml"
+      owner: ocp
+    tags:
+      - openstackclient
+
+  - name: get value of $OS_PASSWORD
+    shell: |
+      grep password {{ base_path }}/.config/openstack/clouds.yaml | awk '{print $2}'
+    register: os_password_ret
+    tags:
+      - openstackclient
+
+  - name: create openstackclient-pod.yaml from template
+    vars:
+      os_password: "{{ os_password_ret.stdout }}"
+    template:
+      src:  "openstackclient-pod.yaml.j2"
+      dest: "{{ base_path }}/openstackclient-pod.yaml"
+      mode: 0644
+    tags:
+      - openstackclient
+
+  - name: copy openstackclientrc for ConfigMap to {{ base_path }}
+    copy:
+      src: files/ocp/openstackclientrc
+      dest: "{{ base_path }}/openstackclientrc"
+      owner: ocp
+    tags:
+      - openstackclient
+
+  - name: create openstackclient-config ConfigMap
+    become_user: ocp
+    shell: |
+      if oc get configmap openstackclient-config; then
+        oc delete configmap openstackclient-config
+      fi
+      oc create configmap openstackclient-config --from-file {{ base_path}}/openstackclientrc --from-file {{ base_path}}/.config/openstack/clouds.yaml
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    tags:
+      - openstackclient
+
+  - name: create openstackclient pod
+    become_user: ocp
+    shell: |
+      if oc get pod/openstackclient; then
+        oc delete pod openstackclient
+      fi
+      oc apply -f {{ base_path }}/openstackclient-pod.yaml
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    tags:
+      - openstackclient

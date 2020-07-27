@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: controller-{{ item }}-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany 
+  resources:
+    requests:
+      storage: 80Gi 
+  storageClassName: controller-{{ item }}-sc

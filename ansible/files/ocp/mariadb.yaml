@@ -1,0 +1,178 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mariadb
+data:
+  config.json: |
+    {
+        "command": "/usr/libexec/mysqld --user=mysql",
+        "config_files": [
+            {
+                "source": "/var/lib/config-data/galera.cnf",
+                "dest": "/etc/my.cnf.d/galera.cnf",
+                "owner": "root",
+                "perm": "0600"
+            }
+        ]
+    }
+  init_config.json: |
+    {
+        "command": "/usr/local/bin/mariadb_init.sh",
+        "config_files": [
+            {
+                "source": "/var/lib/config-data/galera.cnf",
+                "dest": "/etc/my.cnf.d/galera.cnf",
+                "owner": "root",
+                "perm": "0600"
+            },
+            {
+                "source": "/var/lib/config-data/mariadb_init.sh",
+                "dest": "/usr/local/bin/mariadb_init.sh",
+                "owner": "root",
+                "perm": "0755"
+            }
+        ],
+        "permissions": [
+            {
+                "path": "/var/lib/mysql",
+                "owner": "mysql:mysql",
+                "recurse": "true"
+            }
+        ]
+    }
+  galera.cnf: |
+    [client]
+    port = 3306
+    socket = /var/lib/mysql/mysql.sock
+
+    [isamchk]
+    key_buffer_size = 16M
+
+    [mysqld]
+    basedir = /usr
+    bind-address = 127.0.0.1
+    datadir = /var/lib/mysql
+    expire_logs_days = 10
+    innodb_file_per_table = ON
+    key_buffer_size = 16M
+    max_allowed_packet = 16M
+    max_binlog_size = 100M
+    max_connections = 4096
+    open_files_limit = 65536
+    pid-file = /var/lib/mysql/mariadb.pid
+    port = 3306
+    query_cache_limit = 1M
+    query_cache_size = 16M
+    skip-external-locking
+    socket = /var/lib/mysql/mysql.sock
+    ssl = false
+    thread_cache_size = 8
+    thread_stack = 256K
+    tmpdir = /tmp
+    user = mysql
+
+    [mysqld_safe]
+    nice = 0
+    pid-file = /var/lib/mysql/mariadb.pid
+    socket = /var/lib/mysql/mysql.sock
+
+    [mysqldump]
+    max_allowed_packet = 16M
+    quick
+    quote-names
+  mariadb_init.sh: |
+    if [ -e /var/lib/mysql/mysql ]; then exit 0; fi
+    #echo -e "\n[mysqld]\nwsrep_provider=none" >> /etc/my.cnf
+    #kolla_set_configs
+    #sudo -u mysql -E kolla_extend_start
+    mkdir -p /var/lib/mysql
+    mysql_install_db
+    mysqld_safe --skip-networking --wsrep-on=OFF &
+    timeout ${DB_MAX_TIMEOUT} /bin/bash -c 'until mysqladmin -uroot -p"${DB_ROOT_PASSWORD}" ping 2>/dev/null; do sleep 1; done'
+    mysql -uroot -p"${DB_ROOT_PASSWORD}" -e "CREATE USER 'mysql'@'localhost';"
+    mysql -uroot -p"${DB_ROOT_PASSWORD}" -e "REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql'@'localhost';"
+    timeout ${DB_MAX_TIMEOUT} mysqladmin -uroot -p"${DB_ROOT_PASSWORD}" shutdown
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mariadb
+  labels:
+    app: openstack-db-mariadb
+spec:
+  containers:
+  - name: mariadb
+    image: docker.io/tripleomaster/centos-binary-mariadb:current-tripleo
+    #user: root
+    #command: ['/bin/sleep', '720']
+    volumeMounts:
+    - mountPath: /var/lib/config-data
+      readOnly: true
+      name: config-data
+    - mountPath: /var/lib/kolla/config_files
+      readOnly: true
+      name: kolla-config
+    - mountPath: /var/lib/mysql
+      name: lib-data
+    env:
+    - name: KOLLA_CONFIG_STRATEGY
+      value: COPY_ALWAYS
+  volumes:
+  - name: kolla-config
+    configMap:
+      name: mariadb
+      items:
+        - key: config.json
+          path: config.json
+  - name: kolla-config-init
+    configMap:
+      name: mariadb
+      items:
+        - key: init_config.json
+          path: config.json
+  - name: config-data
+    configMap:
+      name: mariadb
+      items:
+        - key: galera.cnf
+          path: galera.cnf
+        - key: mariadb_init.sh
+          path: mariadb_init.sh
+  - name: lib-data
+    persistentVolumeClaim:
+      claimName: mariadb
+  initContainers:
+  - name: mariadb-init
+    image: docker.io/tripleomaster/centos-binary-mariadb:current-tripleo
+    #user: root
+    #command: ['/bin/sleep', '720']
+    volumeMounts:
+    - mountPath: /var/lib/config-data
+      readOnly: true
+      name: config-data
+    - mountPath: /var/lib/kolla/config_files
+      readOnly: true
+      name: kolla-config-init
+    - mountPath: /var/lib/mysql
+      name: lib-data
+    env:
+    - name: KOLLA_CONFIG_STRATEGY
+      value: COPY_ALWAYS
+    - name: KOLLA_BOOTSTRAP
+      value: 'true'
+    - name: DB_MAX_TIMEOUT
+      value: '30'
+    - name: DB_ROOT_PASSWORD
+      value: foobar123
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openstack-db-mariadb
+spec:
+  selector:
+    app: openstack-db-mariadb
+  ports:
+    - protocol: TCP
+      port: 3306
+      targetPort: 3306

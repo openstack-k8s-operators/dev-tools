@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: controller-{{ item }}-pv
+spec:
+  capacity:
+    storage: 80Gi 
+  accessModes:
+  - ReadWriteMany 
+  nfs: 
+    path: /home/nfs/pv/controller-{{ item }}
+    server: {{ ansible_fqdn }}
+  persistentVolumeReclaimPolicy: Retain 
+  storageClassName: controller-{{ item }}-sc

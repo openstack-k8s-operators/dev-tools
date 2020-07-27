@@ -1,0 +1,124 @@
+#!/usr/bin/env ansible-playbook
+---
+- hosts: convergence_base
+  become: yes
+  become_user: root
+  vars_files: "vars/default.yaml"
+  tasks:
+  - name: Install required package
+    package:
+      state: installed
+      name:
+      - sqlite
+  - name: Set opm dowload url suffix
+    set_fact: opm_url_suffix="latest/download"
+    when: opm_version is undefined or opm_version == "latest"
+
+  - name: Set opm dowload url suffix
+    set_fact: opm_url_suffix="download/{{ opm_version }}"
+    when: opm_version is defined and opm_version != "latest"
+
+  - name: Download opm
+    get_url:
+      url: https://github.com/operator-framework/operator-registry/releases/{{ opm_url_suffix }}/linux-amd64-opm
+      dest: /usr/local/bin/opm
+      mode: '0755'
+
+- hosts: convergence_base
+  become: yes
+  become_user: ocp
+  vars_files: "vars/default.yaml"
+  environment:
+    PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+    KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  tasks:
+  - name: Create {{ base_path }}/github.com/openstack-k8s-operators
+    file:
+      path: "{{ base_path }}/github.com/openstack-k8s-operators/openstack-cluster-operator"
+      state: directory
+      mode: '0755'
+
+  - name: Clone openstack-k8s-operators with force=yes to be able to rerun
+    git:
+      repo: "{{ openstack_k8s_operators_https_url | default('https://github.com/openstack-k8s-operators', true) }}/{{ item }}.git"
+      dest: "{{ base_path }}/github.com/openstack-k8s-operators/{{ item }}"
+      version: "{{ openstack_k8s_operators_cluster_branch | default('HEAD', true) }}"
+      force: yes
+    with_items:
+      - openstack-cluster-operator
+
+  - name: switch to openstack project/namespace
+    ignore_errors: true
+    shell: >
+      oc project openstack
+    register: openstack_project_switch
+
+  # if OpenStack project/namespace does not exist
+  - name: create OpenStack project/namespace
+    shell: |
+      oc adm new-project openstack &&
+      oc project openstack
+    when: openstack_project_switch.rc == 1
+
+  - name: build the csv-merger
+    shell: >
+      make csv-merger
+    args:
+      chdir: "{{ base_path }}/github.com/openstack-k8s-operators/openstack-cluster-operator"
+      creates: "{{ base_path }}/github.com/openstack-k8s-operators/openstack-cluster-operator/build/_output/csv-merger"
+
+  - name: build CSV manifest locally
+    shell: >
+      scripts/build-manifests.sh
+    args:
+      executable: /bin/bash
+      chdir: "{{ base_path }}/github.com/openstack-k8s-operators/openstack-cluster-operator"
+      creates: "{{ base_path }}/github.com/openstack-k8s-operators/openstack-cluster-operator/deploy/olm-catalog/openstack-cluster/{{csv_version}}/openstack-cluster-operator.v{{csv_version}}.clusterserviceversion.yaml"
+    environment:
+      CSV_VERSION: "{{csv_version}}"
+      OPERATOR_IMAGE: "{{cluster_operator_image}}"
+      NOVA_IMAGE: "{{nova_operator_image}}"
+      NEUTRON_IMAGE: "{{neutron_operator_image}}"
+      COMPUTE_WORKER_IMAGE: "{{compute_node_operator_image}}"
+      KEYSTONE_IMAGE: "{{keystone_operator_image}}"
+
+  - name: create and push a local bundle image to the registry
+    shell: >
+      scripts/create-local-bundle.sh
+    args:
+      executable: /bin/bash
+      chdir: "{{ base_path }}/github.com/openstack-k8s-operators/openstack-cluster-operator"
+    environment:
+      BUNDLE_VERSION: "{{csv_version}}" # as a convention our bundle version will follow the CSV version
+
+  - name: get_image_registry_url
+    shell: >
+      oc get route -n openshift-image-registry -o json | jq ".items[0].spec.host" -r
+    register: image_registry_url
+
+  - name: create and push a local index image to the registry
+    shell: >
+      scripts/create-local-index.sh
+    args:
+      executable: /bin/bash
+      chdir: "{{ base_path }}/github.com/openstack-k8s-operators/openstack-cluster-operator"
+    environment:
+      INDEX_VERSION: "{{csv_version}}" # as a convention our index version will follow the CSV version
+      BUNDLE_VERSION: "{{csv_version}}" # as a convention our bundle version will follow the CSV version
+      BUNDLE_IMAGE: "{{image_registry_url.stdout}}/openstack/openstack-cluster-bundle:v{{csv_version}}"
+
+  - name: deploy operators via OLM using the index
+    shell: >
+      scripts/deploy-with-olm.sh
+    args:
+      executable: /bin/bash
+      chdir: "{{ base_path }}/github.com/openstack-k8s-operators/openstack-cluster-operator"
+    environment:
+      CSV_VERSION: "{{csv_version}}"
+      #NOTE: we use the internal service name as this is how the catalogsource will pull this index image from the OpenShift image registry
+      INDEX_IMAGE: "image-registry.openshift-image-registry.svc:5000/openstack/openstack-operators-index:v{{csv_version}}"
+
+  - name: switch back to default project/namespace
+    shell: >
+      oc project default

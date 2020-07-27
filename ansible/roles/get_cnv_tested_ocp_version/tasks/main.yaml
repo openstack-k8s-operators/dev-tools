@@ -1,0 +1,43 @@
+---
+- name: Read OCP verison
+  become: false
+  delegate_to: localhost
+  ignore_errors: yes
+  run_once: true
+  block:
+  - name: Create temporary file for storing ocp version
+    tempfile:
+      state: file
+      prefix: ocp_cnv_version
+    register: ocp_version_tempfile
+
+  - name: Get the latest verified OCP version
+    get_url:
+       url: "{{ ocp_cnv_tested_version_url }}"
+       dest: "{{ ocp_version_tempfile.path }}"
+       force: yes
+
+  - name: Set the OCP version fact
+    set_fact:
+      ocp_cnv_tested_version: "{{ lookup('file', '{{ ocp_version_tempfile.path }}') | default('{{ ocp_fallback_release_version }}', true) }}"
+
+  # ocp_release is used for "curl https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/<ocp_release>.0-0.ci/latest | grep -o 'registry.svc.ci.openshift.org[^"]\+'"
+  - name: Set the OCP release fact
+    set_fact:
+      ocp_release: "{{ ocp_cnv_tested_version | regex_search('^[0-9]*.[0-9]*')}}"
+
+  # OCP release image calculated by the get_cnv_tested_ocp_version role
+  - name: Set the OCP release fact
+    set_fact:
+      ocp_release_image: "{{ ocp_registry_url }}:{{ ocp_cnv_tested_version }}"
+
+  - name: Remove temporary file
+    file:
+      path: "{{ ocp_version_tempfile.path }}"
+      state: absent
+
+  - name: Debug
+    debug:
+      msg:
+        - "OCP version {{ ocp_cnv_tested_version }}"
+        - "OCP release {{ ocp_release }}"

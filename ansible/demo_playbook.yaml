@@ -1,0 +1,98 @@
+---
+- hosts: convergence_base
+  become: true
+  become_user: root
+
+  tasks:
+  - name: Include variables
+    include_vars: vars/default.yaml
+
+  - name: create demo dir
+    file:
+      path: "{{ base_path }}/demo"
+      state: directory
+
+  - name: copy demo files to {{ base_path }}/demo
+    copy:
+      src:  "{{ item }}"
+      dest: "{{ base_path }}/demo/"
+      mode: 0644
+    with_fileglob:
+      - files/ocp/demo/*
+
+  - name: install python3-passlib if needed
+    package:
+      name: python3-passlib
+      state: present
+
+  - name: create htpasswd file
+    htpasswd:
+      create: yes
+      state: present
+      name: demo
+      password: demo
+      path: "{{ base_path }}/htpasswd"
+
+  - name: create secret for htpasswd file
+    become_user: ocp
+    shell: |
+      if oc get secret htpass-secret -n openshift-config; then
+        oc delete secret htpass-secret -n openshift-config
+      fi
+      oc create secret generic htpass-secret --from-file=htpasswd={{ base_path }}/htpasswd -n openshift-config
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  - name: create htpasswd identity provider
+    become_user: ocp
+    shell: >
+      oc apply -f {{ base_path }}/demo/htpasswd-identity-provider.yaml
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  - name: create clusterrolebinding for cluster-admin to demo user
+    become_user: ocp
+    shell: |
+      if ! oc get clusterrolebinding demo-crb; then
+        oc create clusterrolebinding demo-crb --clusterrole cluster-admin --user demo
+      fi
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+
+  - name: annotate workers 4 for deletion when we scale down
+    become_user: ocp
+    shell: |
+      worker=$(oc get node/{{ item }} -o json | jq -r '.metadata.annotations["machine.openshift.io/machine"]' | cut -d/ -f2)
+      oc annotate -n openshift-machine-api machines $worker machine.openshift.io/cluster-api-delete-machine=1 --overwrite
+    environment:
+      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+    loop:
+      - worker-4
+
+  - name: create OCP content
+    shell: |
+      source {{ base_path }}/cnvrc
+      if ! [[ $(openstack network list | grep private) ]]; then
+        openstack network create private
+        openstack subnet create subnet1 --network private --subnet-range 192.168.0.0/24
+      fi
+      if ! [[ $(openstack flavor list | grep m1.small) ]]; then
+        openstack flavor create --ram 512 --vcpus 1 --disk 1 --ephemeral 1 m1.small
+      fi
+      if ! [[ $(openstack image list | grep cirros) ]]; then
+        curl -L -o {{ base_path }}/demo/cirros-0.3.5-x86_64-disk.img https://github.com/cirros-dev/cirros/releases/download/0.3.5/cirros-0.3.5-x86_64-disk.img
+        openstack image create --container-format bare --disk-format qcow2 --file {{ base_path }}/demo/cirros-0.3.5-x86_64-disk.img cirros
+      fi
+      if ! [[ $(openstack security group rule list default | egrep "icmp|22") ]]; then
+        openstack security group rule create --protocol icmp --ingress --icmp-type -1 default
+        openstack security group rule create --protocol tcp --ingress --dst-port 22 default
+      fi
+
+  - name: Create demo instance
+    shell: |
+      source {{ base_path }}/cnvrc
+      openstack server create --flavor m1.small --image cirros --nic net-id=$(openstack network list --name private -f value -c ID) demo

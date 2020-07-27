@@ -1,0 +1,32 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: ostest
+    machine.openshift.io/cluster-api-machine-role: worker-osp
+    machine.openshift.io/cluster-api-machine-type: worker-osp
+  name: ostest-worker-osp-0
+  namespace: openshift-machine-api
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: ostest
+      machine.openshift.io/cluster-api-machineset: ostest-worker-osp-0
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: ostest
+        machine.openshift.io/cluster-api-machine-role: worker-osp
+        machine.openshift.io/cluster-api-machine-type: worker-osp
+        machine.openshift.io/cluster-api-machineset: ostest-worker-osp-0
+    spec:
+      providerSpec:
+        value:
+          hostSelector: {}
+          image:
+            checksum: {{ rhcos_image_url ~ ".md5sum" }}
+            url: {{ rhcos_image_url }}
+          metadata:
+          userData:
+            name: worker-osp-user-data
