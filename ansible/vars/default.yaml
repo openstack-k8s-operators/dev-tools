@@ -2,8 +2,17 @@
 base_path: /home/ocp
 #dev_scripts_repo: defaults to "https://github.com/openshift-metal3/dev-scripts.git"
 #dev_scripts_branch: defaults to "HEAD"
-#dev_scripts_repo: "https://github.com/stuggi/dev-scripts.git"
-#dev_scripts_branch: "masters_schedulable"
+
+# private repo to read required secret files from
+# The playbooks expect secret files which can be placed in a private repo
+# Right now these are:
+# * rhel-subscription.yaml - content:
+#   rhel_subscription_activation_key: <activation key>
+#   rhel_subscription_org_id: "xxxxxxx"
+# * pull-secret
+#   obtain it from https://cloud.redhat.com/openshift/install/pull-secret
+#secrets_repo: https uri to repo, no default manual local file is expected if not present
+#secrets_branch: defaults to "HEAD"
 
 # dev scripts switched to ipv6 per default, for now switch back
 # https://github.com/openshift-metal3/dev-scripts/pull/969

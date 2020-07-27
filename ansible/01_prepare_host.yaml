@@ -29,7 +29,9 @@
       vars:
         rhos_release_args: "-x"
 
-    - block:
+    - name: use local rhel-subscription info
+      when: secrets_repo is undefined
+      block:
       - name: Include rhel-subscription info
         include_vars: vars/rhel-subscription.yaml
       rescue:
@@ -37,6 +39,32 @@
           msg: |
             vars/rhel-subscription.yaml is not present. You must create this
             file manually. The format of the file is:
+
+            rhel_subscription_activation_key: <activation key>
+            rhel_subscription_org_id: "xxxxxxx"
+
+    - name: use secrets_repo
+      when: secrets_repo is defined
+      block:
+      - set_fact:
+          secrets_repo_path: "{{ ansible_env.HOME }}/{{ secrets_repo | urlsplit('hostname') }}/{{ (secrets_repo | urlsplit('path') | splitext)[0] }}"
+      - name: create base dir for secrets_repo repo
+        file:
+          path: "{{ secrets_repo_path }}"
+          state: directory
+          mode: "0755"
+      - name: Clone the repo specified in secrets_repo
+        git:
+          repo: "{{ secrets_repo }}"
+          dest: "{{ secrets_repo_path }}"
+          version: "{{ secrets_branch | default('HEAD', true) }}"
+      - name: Include rhel-subscription info
+        include_vars: "{{ secrets_repo_path }}/rhel-subscription.yaml"
+      rescue:
+      - fail:
+          msg: |
+            rhel-subscription.yaml is not present in {{ secrets_repo }}. You must create this
+            file. The format of the file is:
 
             rhel_subscription_activation_key: <activation key>
             rhel_subscription_org_id: "xxxxxxx"
