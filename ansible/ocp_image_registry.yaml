@@ -2,175 +2,59 @@
 # It does primarily 3 things:
 # 1) Sets the registry managementState to 'Managed'
 # 2) Enables a 'defaultRoute' for the registry. This allows us to easily push images from outside the cluster.
-# 3) Configures a storage PV. (emtpydir for now, switch to NFS for our dev environment?)
 
 ---
-- hosts: convergence_base
-  become: true
-  become_user: ocp
+- hosts: localhost
 
   tasks:
   - name: Include variables
     include_vars: vars/default.yaml
 
-  - name: check if image registry is managed
+  - name: Get local oc facts
+    include_tasks: local_oc_facts.yaml
+
+  - name: set image registry to managed
     shell: >
-      oc get configs.imageregistry.operator.openshift.io/cluster -o json | jq '.spec.managementState' -r | grep Removed
-    register: image_registry_removed
-    args:
-      chdir: "{{ base_path }}"
+      oc patch configs.imageregistry.operator.openshift.io/cluster \
+          --patch '{"spec":{"managementState":"Managed"}}' --type=merge
     environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-    ignore_errors: true
+      KUBECONFIG: "{{ kubeconfig }}"
 
-  - name: if image registry is not managed
-    when: image_registry_removed.rc == 0
-    block:
-    - name: set image registry to managed
-      shell: >
-        oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"managementState":"Managed"}}' --type=merge
-      args:
-        chdir: "{{ base_path }}"
-      environment:
-        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-      ignore_errors: false
-
-  - name: check if image registry default route is already enabled
+  - name: enable default route on image registry
     shell: >
-      oc get configs.imageregistry.operator.openshift.io/cluster -o json | jq '.spec.defaultRoute' -r | grep null
-    register: default_route_disabled
-    args:
-      chdir: "{{ base_path }}"
+      oc patch configs.imageregistry.operator.openshift.io/cluster \
+          --patch '{"spec":{"defaultRoute":true}}' --type=merge
     environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-    ignore_errors: true
+      KUBECONFIG: "{{ kubeconfig }}"
 
-  - name: if default route is not enabled
-    when: default_route_disabled.rc == 0
-    block:
-    - name: enable default route on image registry
-      shell: >
-        oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge
-      args:
-        chdir: "{{ base_path }}"
-      environment:
-        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-      ignore_errors: false
+  - name: Copy PVC to working dir
+    copy:
+      src: openshift-image-registry-pvc.yaml
+      dest: "{{ working_dir }}/"
 
-  - name: check if image registry pv exists
+  - name: Create PVC
+    shell: |
+      oc apply -f "{{ working_dir }}/openshift-image-registry-pvc.yaml"
+    environment:
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: configure storage pvc for openshift-image-registry
     shell: >
-      oc get pv -n openshift-image-registry | grep openshift-image-registry-pv
-    register: image_registry_exists_check
-    args:
-      chdir: "{{ base_path }}"
+      oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
+          --patch '{"spec":{"storage":{"pvc":{"claim": "openshift-image-registry-pvc"}}}}'
     environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-    ignore_errors: true
-
-  - name: if image registry PV does not exist
-    when: image_registry_exists_check.rc == 1
-    block:
-    - name: Create NFS export directory
-      file:
-        path: "/home/nfs/pv/openshift-image-registry"
-        state: directory
-        mode: '0777'
-        owner: root
-      become_user: root
-      become: true
-
-    - name: Add to /etc/exports
-      lineinfile:
-        path: /etc/exports
-        line: "/home/nfs/pv/openshift-image-registry *(rw,sync,no_root_squash)"
-      become_user: root
-      become: true
-
-    - name: Export NFS share to the server
-      command: "exportfs -ra"
-      become_user: root
-      become: true
-
-    - name: copy openshift-image-registry-sc.yaml to {{ base_path }}
-      copy:
-        src: files/openshift-image-registry-sc.yaml
-        dest: "{{ base_path }}/openshift-image-registry-sc.yaml"
-        owner: ocp
-
-    - name: copy openshift-image-registry-pv.yaml to {{ base_path }}
-      template:
-        src: "openshift-image-registry-pv.yaml.j2"
-        dest: "{{ base_path }}/openshift-image-registry-pv.yaml"
-        owner: ocp
-        mode: 0644
-
-    - name: copy openshift-image-registry-pvc.yaml to {{ base_path }}
-      template:
-        src: "openshift-image-registry-pvc.yaml.j2"
-        dest: "{{ base_path }}/openshift-image-registry-pvc.yaml"
-        owner: ocp
-        mode: 0644
-
-    - name: Create a SC, PV, and PVC for openshift-image-registry
-      shell: |
-         oc apply -f openshift-image-registry-sc.yaml
-         oc apply -f openshift-image-registry-pv.yaml
-         oc apply -f openshift-image-registry-pvc.yaml
-      args:
-        chdir: "{{ base_path }}"
-      environment:
-        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-
-  - name: check if image registry storage is set to pvc
-    shell: >
-      oc get configs.imageregistry.operator.openshift.io/cluster -o json | jq '.spec.storage.pvc' -r | grep null
-    register: storage_pvc_unset
-    args:
-      chdir: "{{ base_path }}"
-    environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-    ignore_errors: true
-
-  - name: if storage pvc is unset for openshift-image-registry
-    when: storage_pvc_unset.rc == 0
-    block:
-    - name: configure storage pvc for openshift-image-registry
-      shell: >
-        oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"pvc":{"claim": "openshift-image-registry-pvc"}}}}'
-      args:
-        chdir: "{{ base_path }}"
-      environment:
-        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-      ignore_errors: false
+      KUBECONFIG: "{{ kubeconfig }}"
 
   - name: wait for image registry to be deployed
     shell: >
-      oc get pods -n openshift-image-registry | grep node | grep Running
-    args:
-      chdir: "{{ base_path }}"
+      oc wait --for condition=available -n openshift-image-registry deployment/image-registry
     environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-    register: image_registry_deployed_res
-    retries: 10
-    delay: 2
-    until: image_registry_deployed_res.rc == 0
+      KUBECONFIG: "{{ kubeconfig }}"
 
   - name: add OpenShift CA cert to local disk (so we can access the image registry)
     shell: >
       cat $KUBECONFIG | grep certificate-authority-data | head -n 1 | cut -f 6 -d " " | base64 -d > /etc/ssl/certs/openshift.pem
-    args:
-      chdir: "{{ base_path }}"
     environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+      KUBECONFIG: "{{ kubeconfig }}"
     become_user: root
     become: true    
