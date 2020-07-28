@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# Usage:
+#   mysql-db <db name> <db user> <db password>
+#
+# Get an interactive mysql shell in the specified db
+
+set -e
+
+db=$1 && shift
+user=$1 && shift
+password=$1 && shift
+
+namespace=openstack
+service=openstack-db-mariadb
+
+cmd="mysql -h $service -P 3306 -u${user} -p${password} ${db}"
+
+export KUBECONFIG="{{ kubeconfig }}"
+
+exec oc run mariadb-client-$db --rm --tty -i \
+        --restart='Never' --namespace $namespace \
+        --image docker.io/tripleomaster/centos-binary-mariadb:current-tripleo \
+        --command -- ${cmd}

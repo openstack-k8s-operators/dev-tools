@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Get an interactive admin mysql shell
+
+set -e
+
+namespace=openstack
+service=openstack-db-mariadb
+secret=mariadb-admin
+field=DBRootPassword
+
+password=$(oc get secret --namespace $namespace $secret \
+           -o jsonpath="{.data.$field}" | base64 --decode)
+cmd="mysql -h $service -P 3306 -uroot -p${password}"
+
+export KUBECONFIG="{{ kubeconfig }}"
+
+exec oc run mariadb-client-admin --rm --tty -i \
+        --restart='Never' --namespace $namespace \
+        --image docker.io/tripleomaster/centos-binary-mariadb:current-tripleo \
+        --command -- ${cmd}

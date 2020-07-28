@@ -1,0 +1,28 @@
+---
+- hosts: localhost
+
+  tasks:
+  - name: Get local oc facts
+    include_tasks: local_oc_facts.yaml
+
+  - set_fact:
+      ns_yaml_dir: "{{ working_dir }}/yamls/namespace"
+
+  - name: Create namespace yaml dir
+    file:
+      path: "{{ ns_yaml_dir }}"
+      state: directory
+
+  - name: Copy common namespace to working dir
+    copy:
+      src: "{{ item }}"
+      dest: "{{ ns_yaml_dir }}/"
+    with_fileglob:
+    - "ocp/namespace/*"
+
+  - name: Deploy namespace
+    shell: |
+      oc apply -f "{{ ns_yaml_dir }}/namespace.yaml"
+      oc apply -f "{{ ns_yaml_dir }}"
+    environment:
+      KUBECONFIG: "{{ kubeconfig }}"
