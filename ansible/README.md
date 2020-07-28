@@ -70,7 +70,7 @@ get root priviledges to the host via passwordless sudo.
 ```
 ssh root@<beaker node>
 dnf install -y git
-git -c http.sslVerify=false clone https://gitlab.cee.redhat.com/mschuppe/openstack-k8s.git
+git clone git@github.com:openstack-k8s-operators/dev-tools.git
 ```
 
 ##### Install Ansible
@@ -93,7 +93,7 @@ There is a Makefile which runs all the steps per default
 
 ```
 dnf install -y make
-cd openstack-k8s/ansible
+cd dev-scripts/ansible
 make
 ```
 
