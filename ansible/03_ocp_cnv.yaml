@@ -17,7 +17,7 @@
 
     - name: download deploy_marketplace.sh
       get_url:
-        url: "https://raw.githubusercontent.com/kubevirt/hyperconverged-cluster-operator/master/deploy/{{ item }}"
+        url: "https://raw.githubusercontent.com/nunnatsa/hyperconverged-cluster-operator/release-4.5/deploy/{{ item }}"
         dest: "{{ base_path }}/cnv/{{ item }}"
         mode: '0755'
       with_items:
@@ -34,8 +34,8 @@
         KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
         APP_REGISTRY: "redhat-operators"
         TARGET_NAMESPACE: "openshift-cnv"
-        HCO_VERSION: 2.2.0
-        HCO_CHANNEL: 2.2
+        HCO_VERSION: 2.3.0
+        HCO_CHANNEL: 2.3
       ignore_errors: true
 
     - name: install cnv
@@ -48,13 +48,13 @@
         KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
         APP_REGISTRY: "redhat-operators"
         TARGET_NAMESPACE: "openshift-cnv"
-        HCO_VERSION: 2.2.0
-        HCO_CHANNEL: 2.2
+        HCO_VERSION: 2.3.0
+        HCO_CHANNEL: 2.3
 
-    - name: enable cnv-2.2-for-rhel-8-x86_64-rpms to install kubevirt-virtctl
+    - name: enable cnv-2.3-for-rhel-8-x86_64-rpms to install kubevirt-virtctl
       become: true
       become_user: root
-      command: subscription-manager repos --enable=cnv-2.2-for-rhel-8-x86_64-rpms
+      command: subscription-manager repos --enable=cnv-2.3-for-rhel-8-x86_64-rpms
 
     - name: Install kubevirt-virtctl package
       become: true
