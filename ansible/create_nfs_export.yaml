@@ -75,7 +75,7 @@
       import_role: name=oc_local
 
     - set_fact:
-        yaml_dir: "{{ working_dir }}/yamls/{{ group }}"
+        yaml_dir: "{{ working_yamls_dir }}/{{ group }}"
 
     - name: Create local yamldir
       file:

@@ -6,7 +6,7 @@
 
   tasks:
   - set_fact:
-      mariadb_yaml_dir: "{{ working_dir }}/yamls/mariadb"
+      mariadb_yaml_dir: "{{ working_yamls_dir }}/mariadb"
 
   - debug:
       msg: "yamls will be written to {{ mariadb_yaml_dir }} locally"
