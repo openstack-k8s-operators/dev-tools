@@ -1,71 +1,35 @@
 ---
-- hosts: convergence_base
-  become: true
+- hosts: localhost
 
   tasks:
-  - name: Include variables
-    include_vars: vars/default.yaml
-    tags:
-      - always
+  - name: Get local oc facts
+    include_tasks: local_oc_facts.yaml
 
-  - name: render {{ base_path }}/rabbitmq-storage.yaml
-    template:
-      src: rabbitmq-storage.yaml.j2
-      dest: "{{ base_path }}/rabbitmq-storage.yaml"
-      owner: ocp
+  - set_fact:
+      rabbitmq_yaml_dir: "{{ working_dir }}/yamls/rabbitmq"
 
-  - name: create rabbitmq storage
-    become_user: ocp
-    shell: |
-      # need to delete the pod before the pvc
-      if oc get pods rabbitmq; then
-        oc delete pods rabbitmq
-      fi
-      if oc get pvc rabbitmq; then
-        oc delete pvc rabbitmq
-      fi
-      if oc get pv rabbitmq; then
-        oc delete pv rabbitmq
-      fi
-      if oc get configmap rabbitmq; then
-        oc delete configmap rabbitmq
-      fi
-      if oc get service openstack-rabbitmq; then
-        oc delete service openstack-rabbitmq
-      fi
-      oc create -f {{ base_path }}/rabbitmq-storage.yaml
-    args:
-      chdir: "{{ base_path }}"
-    environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+  - debug:
+      msg: "yamls will be written to {{ rabbitmq_yaml_dir }} locally"
 
-  - name: create /var/lib/rabbitmq on {{ rabbitmq_storage_worker }}
-    become_user: ocp
-    shell: |
-      oc debug nodes/{{ rabbitmq_storage_worker }} -- rm -rf /host/var/lib/rabbitmq
-      oc debug nodes/{{ rabbitmq_storage_worker }} -- mkdir -p /host/var/lib/rabbitmq
-    args:
-      chdir: "{{ base_path }}"
-    environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+  - name: Create yaml dir
+    file:
+      path: "{{ rabbitmq_yaml_dir }}"
+      state: directory
 
-  - name: copy rabbitmq.yaml to {{ base_path }}
+  - name: Copy deployment yamls to working dir
     copy:
-      src: files/ocp/rabbitmq.yaml
-      dest: "{{ base_path }}/rabbitmq.yaml"
-      owner: ocp
+      src: "{{ item }}"
+      dest: "{{ rabbitmq_yaml_dir }}/"
+    with_fileglob:
+    - "files/ocp/rabbitmq/*"
 
-  - name: create rabbitmq pod
-    become_user: ocp
+  - name: Deploy rabbitmq
     shell: |
-      if oc get pods rabbitmq; then
-        oc delete pods rabbitmq
-      fi
-      oc create -f rabbitmq.yaml
-    args:
-      chdir: "{{ base_path }}"
+      oc apply -f "{{ rabbitmq_yaml_dir }}"
     environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Wait for deployment
+    shell: |
+      oc wait -n openstack deployment/rabbitmq \
+          --for condition=available --timeout=60s
