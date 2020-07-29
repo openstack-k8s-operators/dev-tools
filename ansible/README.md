@@ -93,7 +93,7 @@ There is a Makefile which runs all the steps per default
 
 ```
 dnf install -y make
-cd dev-scripts/ansible
+cd dev-tools/ansible
 make
 ```
 
@@ -135,48 +135,8 @@ Pwd: The admin password can be found in the `/home/stack/cnvrc` file on the unde
 
 ```
 su - ocp
-export KUBECONFIG=/home/ocp/dev-scripts/ocp/osponocp/auth/kubeconfig
+export KUBECONFIG=/home/ocp/dev-scripts/ocp/ostest/auth/kubeconfig
 oc get pods -n openstack
-```
-
-##### Access OSP controller node if required
-
-```
-su - ocp
-ssh -i .ssh/id_rsa_osp  root@192.168.25.20
-```
-
-##### Create instance on OSP env
-
-* create private network
-
-```
-ssh undercloud
-su - stack
-source cnvrc
-openstack network create private
-openstack subnet create subnet1 --network private --subnet-range 192.168.0.0/24
-openstack flavor create --ram 512 --vcpus 1 --disk 1 --ephemeral 1 m1.small
-```
-
-* Create image
-
-```
-curl -L -o cirros-0.3.5-x86_64-disk.img https://github.com/cirros-dev/cirros/releases/download/0.3.5/cirros-0.3.5-x86_64-disk.img
-openstack image create --container-format bare --disk-format qcow2 --file cirros-0.3.5-x86_64-disk.img cirros
-```
-
-* Modify sec policy to allow ping and ssh
-
-```
-openstack security group rule create --protocol icmp --ingress --icmp-type -1 default
-openstack security group rule create --protocol tcp --ingress --dst-port 22 default
-```
-
-* create instance
-
-```
-openstack server create --flavor m1.small --image cirros --nic net-id=$(openstack network list --name private -f value -c ID) test
 ```
 
 #### Cleanup full env:
@@ -305,35 +265,6 @@ This will delete the delete the CSV, Subscription, Catalogsource, and OperatorGr
 NOTE: After uninstalling operators if you wish to re-install you should bump
 the csv_version Ansible variable before running 'make olm' again within your
 development environment to ensure a fresh version of all images gets pulled.
-
-##### Create persistent storage and ctrlplane network using
-
-```
-ansible-playbook 04_osp-controller-vm-storage.yaml
-ansible-playbook 05_osp-controller-vm-network.yaml
-```
-
-##### Create the controller vms on CNV
-
-```
-ansible-playbook 06_osp-create-controller-vms.yaml
-```
-
-##### Create the overcloud using tripleo_deploy pod
-
-```
-ansible-playbook 07_osp_tripleo_deploy.yaml
-```
-
-Horizon can be accessed by extending the above used sshuttle command with the net used by OSP:
-
-Run:
-
-```
-sshuttle -r <user>@<virthost> 192.168.111.0/24 192.168.25.0/24
-```
-
-The admin password can be found in the `/home/stack/cnvrc` file on the undercloud.
 
 ##### Create required common-config configmap
 
