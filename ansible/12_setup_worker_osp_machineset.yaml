@@ -85,6 +85,17 @@
         PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
         KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
 
+    - name: label all worker baremetalhosts as potential ocp worker nodes
+      become_user: ocp
+      shell: >
+        oc patch -n openshift-machine-api baremetalhost {{ ocp_cluster_name }}-worker-{{ item }} -p '{"metadata":{"labels": { "ospRole": "worker-osp" }}}' --type merge
+      args:
+        chdir: "{{ base_path }}"
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+        KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+      loop: "{{ range(0, worker_replicas , 1)|list }}"
+
     - name: scale up osp worker nodes by {{ osp_compute_scale }}
       become_user: ocp
       shell: |
