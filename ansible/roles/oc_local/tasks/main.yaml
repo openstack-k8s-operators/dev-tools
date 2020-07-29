@@ -1,0 +1,16 @@
+- name: Get local oc facts
+  shell: |
+    mkdir -p {{ local_working_dir }}
+    cd {{ local_working_dir }}
+    pwd
+  register: working_dir_out
+
+- set_fact:
+    working_dir: "{{ working_dir_out.stdout_lines[0] }}"
+
+- set_fact:
+    working_bin_dir: "{{ working_dir }}/bin"
+    kubeconfig: "{{ working_dir }}/kubeconfig"
+
+- set_fact:
+    oc_env_path: "{{ working_bin_dir }}:{{ ansible_env.PATH | default('') }}"

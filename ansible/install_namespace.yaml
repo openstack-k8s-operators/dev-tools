@@ -1,10 +1,10 @@
 ---
 - hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
 
   tasks:
-  - name: Get local oc facts
-    include_tasks: local_oc_facts.yaml
-
   - set_fact:
       ns_yaml_dir: "{{ working_dir }}/yamls/namespace"
 
@@ -25,4 +25,5 @@
       oc apply -f "{{ ns_yaml_dir }}/namespace.yaml"
       oc apply -f "{{ ns_yaml_dir }}"
     environment:
+      PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"

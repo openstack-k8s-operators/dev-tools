@@ -1,6 +1,6 @@
 # This role only works correctly on localhost due to the use of fetch
-# It creates ~/ostest-working initially containing kubeconfig, and put oc in
-# ~/.local/bin/
+# It creates ~/ostest-working initially containing kubeconfig and a bin
+# directory containing oc.
 
 # Also used indirectly by default variables
 - name: Include variables
@@ -10,24 +10,39 @@
 # correctly locally, and doesn't try to change the permissions on the local
 # directory to the remote user
 
-- name: Ensure local directories exist
-  shell: |
-    mkdir -p {{ local_working_dir }}
-    (cd {{ local_working_dir }}; pwd)
-    mkdir -p {{ local_bin_dir }}
-    (cd {{ local_bin_dir }}; pwd)
-  register: local_dirs
+- name: Create local environment
+  block:
+  - import_role: name=oc_local
+
+  - name: Create bin directory
+    file:
+      path: "{{ working_bin_dir }}"
+      state: directory
+
+  - name: Create environment file
+    template:
+      src: oc_env.sh.j2
+      dest: "{{ working_dir }}/oc_env.sh"
   become: false
   connection: local
 
 - name: Copy kubeconfig
   fetch:
-    dest: "{{ local_dirs.stdout_lines[0] }}/"
+    dest: "{{ kubeconfig }}"
     src: "{{ base_path }}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
     flat: true
 
 - name: Copy oc binary
   fetch:
-    dest: "{{ local_dirs.stdout_lines[1] }}/"
+    dest: "{{ working_bin_dir }}/"
     src: "/usr/local/bin/oc"
     flat: true
+    mode: 0755
+
+- name: Fix permissions on oc binary
+  file:
+    path: "{{ working_bin_dir }}/oc"
+    mode: 0755
+    state: file
+  become: false
+  connection: local

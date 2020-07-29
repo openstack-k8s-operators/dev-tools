@@ -1,9 +1,11 @@
 ---
 - hosts: convergence_base
-  gather_facts: false
   become: true
   become_user: ocp
 
   tasks:
-    - name: Configure oc client
-      include_role: name=export_client_to_controller
+  - name: Include variables
+    include_vars: vars/default.yaml
+
+  - name: Configure oc client
+    include_role: name=export_client_to_controller

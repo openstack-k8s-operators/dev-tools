@@ -5,56 +5,54 @@
 
 ---
 - hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
 
   tasks:
-  - name: Include variables
-    include_vars: vars/default.yaml
+  - set_fact:
+      registry_yaml_dir: "{{ working_dir }}/yamls/image-registry"
 
-  - name: Get local oc facts
-    include_tasks: local_oc_facts.yaml
-
-  - name: set image registry to managed
-    shell: >
-      oc patch configs.imageregistry.operator.openshift.io/cluster \
-          --patch '{"spec":{"managementState":"Managed"}}' --type=merge
-    environment:
-      KUBECONFIG: "{{ kubeconfig }}"
-
-  - name: enable default route on image registry
-    shell: >
-      oc patch configs.imageregistry.operator.openshift.io/cluster \
-          --patch '{"spec":{"defaultRoute":true}}' --type=merge
-    environment:
-      KUBECONFIG: "{{ kubeconfig }}"
+  - name: Create yaml dir
+    file:
+      path: "{{ registry_yaml_dir }}"
+      state: directory
 
   - name: Copy PVC to working dir
     copy:
       src: openshift-image-registry-pvc.yaml
-      dest: "{{ working_dir }}/"
+      dest: "{{ registry_yaml_dir }}/"
 
-  - name: Create PVC
+  - name: Configure image registry
     shell: |
-      oc apply -f "{{ working_dir }}/openshift-image-registry-pvc.yaml"
-    environment:
-      KUBECONFIG: "{{ kubeconfig }}"
+      set -e
 
-  - name: configure storage pvc for openshift-image-registry
-    shell: >
-      oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
+      # Create PVC
+      oc apply -f "{{ registry_yaml_dir }}/openshift-image-registry-pvc.yaml"
+
+      # set image registry to managed
+      oc patch configs.imageregistry.operator.openshift.io/cluster --type=merge \
+          --patch '{"spec":{"managementState":"Managed"}}'
+
+      # enable default route on image registry
+      oc patch configs.imageregistry.operator.openshift.io/cluster --type=merge \
+          --patch '{"spec":{"defaultRoute":true}}'
+
+      # configure storage pvc for openshift-image-registry
+      oc patch configs.imageregistry.operator.openshift.io/cluster --type merge \
           --patch '{"spec":{"storage":{"pvc":{"claim": "openshift-image-registry-pvc"}}}}'
-    environment:
-      KUBECONFIG: "{{ kubeconfig }}"
 
-  - name: wait for image registry to be deployed
-    shell: >
+      # wait for image registry to be deployed
       oc wait --for condition=available -n openshift-image-registry deployment/image-registry
     environment:
+      PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
 
   - name: add OpenShift CA cert to local disk (so we can access the image registry)
     shell: >
-      cat $KUBECONFIG | grep certificate-authority-data | head -n 1 | cut -f 6 -d " " | base64 -d > /etc/ssl/certs/openshift.pem
+      cat $KUBECONFIG | grep certificate-authority-data | \
+        head -n 1 | cut -f 6 -d " " | base64 -d > /etc/ssl/certs/openshift.pem
     environment:
       KUBECONFIG: "{{ kubeconfig }}"
     become_user: root
-    become: true    
+    become: true

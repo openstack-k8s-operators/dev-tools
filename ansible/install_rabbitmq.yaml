@@ -1,10 +1,10 @@
 ---
 - hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
 
   tasks:
-  - name: Get local oc facts
-    include_tasks: local_oc_facts.yaml
-
   - set_fact:
       rabbitmq_yaml_dir: "{{ working_dir }}/yamls/rabbitmq"
 
@@ -26,10 +26,9 @@
   - name: Deploy rabbitmq
     shell: |
       oc apply -f "{{ rabbitmq_yaml_dir }}"
-    environment:
-      KUBECONFIG: "{{ kubeconfig }}"
 
-  - name: Wait for deployment
-    shell: |
       oc wait -n openstack deployment/rabbitmq \
           --for condition=available --timeout=60s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"

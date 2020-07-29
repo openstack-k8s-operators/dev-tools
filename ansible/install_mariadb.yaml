@@ -1,13 +1,12 @@
 ---
 - hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
 
   tasks:
-  - name: Get local oc facts
-    include_tasks: local_oc_facts.yaml
-
   - set_fact:
       mariadb_yaml_dir: "{{ working_dir }}/yamls/mariadb"
-      working_bin_dir: "{{ working_dir }}/bin"
 
   - debug:
       msg: "yamls will be written to {{ mariadb_yaml_dir }} locally"
@@ -28,12 +27,8 @@
     shell: |
       oc apply -f "{{ mariadb_yaml_dir }}"
     environment:
+      PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
-
-  - name: Create bin directory
-    file:
-      path: "{{ working_bin_dir }}"
-      state: directory
 
   - name: Create client utils in {{ working_bin_dir }}
     template:
@@ -49,4 +44,5 @@
       oc wait -n openstack deployment/mariadb \
           --for condition=available --timeout=60s
     environment:
+      PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
