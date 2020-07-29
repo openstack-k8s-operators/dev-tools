@@ -46,7 +46,7 @@ olm:
 	-v -i hosts \
 	olm.yaml
 
-make olm_cleanup:
+olm_cleanup:
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-v -i hosts \
 	olm_cleanup.yaml

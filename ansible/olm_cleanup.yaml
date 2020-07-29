@@ -1,23 +1,23 @@
 ---
-- hosts: convergence_base
-  become: true
-  become_user: ocp
+- hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
 
   tasks:
-  - name: Include variables
-    include_vars: vars/default.yaml
-
   - name: olm cleanup
     command: "{{ item }}"
-    args:
-      chdir: "{{ base_path }}"
     environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-      CSV_VERSION: "{{csv_version}}"
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
     ignore_errors: true
     with_items:
-      - "oc delete csv openstack-cluster-operator.v$CSV_VERSION"
+      - "oc delete csv openstack-cluster-operator.v{{ csv_version }}"
       - "oc delete subscription openstack-cluster"
       - "oc delete catalogsource openstack-index"
       - "oc delete operatorgroup openstack-group"
+
+  - name: Cleanup working directory
+    file:
+      path: "{{ k8s_operators_dir }}/openstack-cluster-operator"
+      state: absent

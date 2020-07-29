@@ -1,4 +1,4 @@
-- name: Get local oc facts
+- name: Create local working directory and get its absolute path
   shell: |
     mkdir -p {{ local_working_dir }}
     cd {{ local_working_dir }}
@@ -10,7 +10,18 @@
 
 - set_fact:
     working_bin_dir: "{{ working_dir }}/bin"
+    working_src_dir: "{{ working_dir }}/src"
     kubeconfig: "{{ working_dir }}/kubeconfig"
 
 - set_fact:
     oc_env_path: "{{ working_bin_dir }}:{{ ansible_env.PATH | default('') }}"
+    k8s_operators_dir: "{{ working_src_dir }}/github.com/openstack-k8s-operators"
+
+- name: Create common subdirectories
+  file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+  - "{{ working_bin_dir }}"
+  - "{{ working_src_dir }}"
+  - "{{ k8s_operators_dir }}"
