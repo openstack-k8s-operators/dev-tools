@@ -37,7 +37,11 @@
       regexp: '^export WORKING_DIR='
       line: export WORKING_DIR='{{ base_path }}'
 
-  - block:
+  - name: Copy pull-secret file 
+    when: secrets_repo is undefined
+    block:
+    - set_fact:
+        secrets_repo_path: "{{ base_path }}"
     - name: Copy pull-secret
       copy:
         dest: "{{ base_path }}/pull-secret"
@@ -49,11 +53,27 @@
           https://cloud.redhat.com/openshift/install/pull-secret and copy it
           there manually.
 
+  - name: use secrets_repo
+    when: secrets_repo is defined
+    block:
+    - set_fact:
+        secrets_repo_path: "{{ base_path }}/{{ secrets_repo | urlsplit('hostname') }}/{{ (secrets_repo | urlsplit('path') | splitext)[0] }}"
+    - name: create base dir for secrets_repo repo
+      file:
+        path: "{{ secrets_repo_path }}"
+        state: directory
+        mode: "0755"
+    - name: Clone the repo specified in secrets_repo
+      git:
+        repo: "{{ secrets_repo }}"
+        dest: "{{ secrets_repo_path }}"
+        version: "{{ secrets_branch | default('HEAD', true) }}"
+
   - name: set PULL_SECRET in {{ base_path }}/dev-scripts/config_$USER.sh
     lineinfile:
       path: "{{ base_path }}/dev-scripts/config_$USER.sh"
       regexp: '^export PULL_SECRET='
-      line: export PULL_SECRET=$(cat "{{ base_path }}/pull-secret")
+      line: export PULL_SECRET=$(cat "{{ secrets_repo_path }}/pull-secret")
 
   - name: set IP_STACK in {{ base_path }}/dev-scripts/config_$USER.sh
     lineinfile:
