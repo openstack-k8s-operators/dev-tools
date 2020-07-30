@@ -20,11 +20,6 @@
       mode: 0755
       remote_src: yes
 
-  - name: Get the OCP version to be used
-    import_role:
-      name: get_cnv_tested_ocp_version
-    when: ocp_release_image is not defined
-
   - name: set OCP release to use
     lineinfile:
       path: "{{ base_path }}/dev-scripts/config_$USER.sh"
