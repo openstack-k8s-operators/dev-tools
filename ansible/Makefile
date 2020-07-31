@@ -13,8 +13,9 @@ ocp_install: local-deps
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts \
 	01_prepare_host.yaml \
-	02_local-nfs-server.yaml \
 	03_ocp_dev_scripts.yaml \
+	04_local_oc_client.yaml \
+	05_default_storageclass.yaml \
 	ocp_image_registry.yaml \
 
 osp_operators_install:
@@ -31,6 +32,7 @@ podified-ctlplane:
 	# NOTE: requires 'make olm'
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts \
+	install_namespace.yaml
 	install_mariadb.yaml \
 	install_rabbitmq.yaml \
 	install_keystone.yaml \
@@ -41,7 +43,7 @@ olm:
 	-v -i hosts \
 	olm.yaml
 
-make olm_cleanup:
+olm_cleanup:
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-v -i hosts \
 	olm_cleanup.yaml

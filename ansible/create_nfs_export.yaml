@@ -1,0 +1,114 @@
+# Imported from vars/default.yaml:
+#   nfs_data_dir:path to dir
+#   nfs_export_dir:path to dir
+#
+# Must be passed to this task list:
+#   group: string
+#   exports: list of (name, size)
+#   storageclass_create: true -> create a storageclass called <group>
+#   storageclass_isdefault: true -> make storageclass the default
+
+- name: Include variables
+  include_vars: vars/default.yaml
+
+- name: Create datadir
+  file:
+    path: "{{ nfs_data_dir }}"
+    state: directory
+    mode: 0751
+    group: root
+    owner: root
+
+# This shell is single ansible task and therefore executes in nearly constant
+# time. Doing this in multiple ansible tasks quickly becomes thousands of times
+# slower than this script as the list size increases.
+# The script is idempotent.
+- name: Create storage
+  shell: |
+    set -e
+
+    cat <<EOF | while read name size shared; do
+    {{ exports_by_line }}
+    EOF
+        fs="{{ nfs_data_dir }}/${name}"
+        mountpoint="{{ nfs_export_dir }}/${name}"
+        exports="/etc/exports.d/{{ group }}.exports"
+
+        if [ ! -f "$fs" ]; then
+            # Create a sparse file of the correct size and populate it with an
+            # ext4 filesystem.
+            truncate -s ${size}G $fs
+            mkfs.ext4 -m 0 "$fs"
+        fi
+
+        # Create the mountpoint, add it to fstab, and mount it
+        if [ ! -d "$mountpoint" ]; then
+            mkdir -p "$mountpoint"
+        fi
+
+        if ! grep -qs "$mountpoint " /etc/fstab; then
+            echo "$fs $mountpoint ext4 defaults 0 1" >> /etc/fstab
+        fi
+
+        if ! grep -qs "$mountpoint " /proc/mounts; then
+            mount "$mountpoint"
+        fi
+        
+        # Make the mount world readable
+        chown nobody.nobody "$mountpoint"
+        chmod 0777 "$mountpoint"
+
+        # Add the export to the relevant file in exports
+        if ! grep -qs "$mountpoint " "$exports"; then
+            echo "$mountpoint *(rw,sync,no_root_squash)" >> "$exports"
+        fi
+
+        exportfs -ra
+    done
+  vars:
+    exports_by_line: "{{ exports | map('join', ' ') | join('\n') }}"
+
+# We run this using the local oc environment
+- name: Create storageclass and PVs
+  block:
+    - name: Import oc environment
+      import_role: name=oc_local
+
+    - set_fact:
+        yaml_dir: "{{ working_yamls_dir }}/{{ group }}"
+
+    - name: Create local yamldir
+      file:
+        path: "{{ yaml_dir }}"
+        state: directory
+
+    - name: Create storageclass yaml
+      template:
+        src: storageclass.yaml.j2
+        dest: "{{ yaml_dir }}/storageclass.yaml"
+        mode: 0644
+        trim_blocks: false
+
+    - name: Create pvs
+      template:
+        src: pv.yaml.j2
+        dest: "{{ yaml_dir }}/{{ item.0 }}.yaml"
+        mode: 0644
+        trim_blocks: false
+      vars:
+        name: "{{ item.0 }}"
+        size: "{{ item.1 }}"
+        shared: "{{ item.2 }}"
+      loop: "{{ exports }}"
+
+    - name: Create storageclass
+      shell:
+        oc apply -f {{ yaml_dir }}
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  when: storageclass_create | default(false)
+  connection: local
+  become: false

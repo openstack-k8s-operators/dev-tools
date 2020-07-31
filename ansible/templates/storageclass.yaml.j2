@@ -1,0 +1,9 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ group }}
+  {% if storageclass_isdefault | default(false) %}
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+  {% endif %}
+provisioner: kubernetes.io/no-provisioner

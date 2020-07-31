@@ -1,71 +1,48 @@
 ---
-- hosts: convergence_base
-  become: true
+- hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
 
   tasks:
-  - name: Include variables
-    include_vars: vars/default.yaml
-    tags:
-      - always
+  - set_fact:
+      mariadb_yaml_dir: "{{ working_yamls_dir }}/mariadb"
 
-  - name: render {{ base_path }}/mariadb-storage.yaml
-    template:
-      src: mariadb-storage.yaml.j2
-      dest: "{{ base_path }}/mariadb-storage.yaml"
-      owner: ocp
+  - debug:
+      msg: "yamls will be written to {{ mariadb_yaml_dir }} locally"
 
-  - name: create mariadb storage
-    become_user: ocp
-    shell: |
-      # need to delete the pod before the pvc
-      if oc get pods mariadb; then
-        oc delete pods mariadb
-      fi
-      if oc get pvc mariadb; then
-        oc delete pvc mariadb
-      fi
-      if oc get pv mariadb; then
-        oc delete pv mariadb
-      fi
-      if oc get storageclass local-storage; then
-        oc delete storageclass local-storage
-      fi
-      if oc get configmap mariadb; then
-        oc delete configmap mariadb
-      fi
-      if oc get service openstack-db-mariadb; then
-        oc delete service openstack-db-mariadb
-      fi
-      oc create -f {{ base_path }}/mariadb-storage.yaml
-    args:
-      chdir: "{{ base_path }}"
-    environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+  - name: Create yaml dir
+    file:
+      path: "{{ mariadb_yaml_dir }}"
+      state: directory
 
-  - name: create /var/lib/mysql on {{ mariadb_storage_worker }}
-    become_user: ocp
-    shell: |
-      oc debug nodes/{{ mariadb_storage_worker }} -- rm -rf /host/var/lib/mysql
-      oc debug nodes/{{ mariadb_storage_worker }} -- mkdir -p /host/var/lib/mysql
-    args:
-      chdir: "{{ base_path }}"
-    environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-
-  - name: copy mariadb.yaml to {{ base_path }}
+  - name: Copy deployment yamls to working dir
     copy:
-      src: files/ocp/mariadb.yaml
-      dest: "{{ base_path }}/mariadb.yaml"
-      owner: ocp
+      src: "{{ item }}"
+      dest: "{{ mariadb_yaml_dir }}/"
+    with_fileglob:
+    - "files/ocp/mariadb/*"
 
-  - name: create mariadb pod
-    become_user: ocp
+  - name: Deploy mariadb
     shell: |
-      oc create -f mariadb.yaml
-    args:
-      chdir: "{{ base_path }}"
+      oc apply -f "{{ mariadb_yaml_dir }}"
     environment:
-      PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-      KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Create client utils in {{ working_bin_dir }}
+    template:
+      src: "mariadb/{{ item }}"
+      dest: "{{ working_bin_dir }}/{{ item }}"
+      mode: 0755
+    loop:
+    - mysql-admin
+    - mysql-db
+
+  - name: Wait for deployment
+    shell: |
+      oc wait -n openstack deployment/mariadb \
+          --for condition=available --timeout=60s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
