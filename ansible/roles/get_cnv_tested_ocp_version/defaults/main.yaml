@@ -1,8 +1,0 @@
-# This OCP version will be used if ocp_cnv_tested_version can not be retrieved.
-ocp_fallback_release_version: '4.4.0-rc.7'
-
-# File containing OCP version that was tested with CNV
-ocp_cnv_tested_version_url: 'http://staging-jenkins2-qe-playground.usersys.redhat.com/job/OCP4.4-retrieve-verified-version-poc/lastSuccessfulBuild/artifact/oc_server_version.html'
-
-# OCP registry
-ocp_registry_url: 'registry.svc.ci.openshift.org/ocp/release'
