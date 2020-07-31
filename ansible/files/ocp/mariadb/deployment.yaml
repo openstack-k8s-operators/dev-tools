@@ -58,6 +58,15 @@ spec:
       initContainers:
       - name: mariadb-init
         image: docker.io/tripleomaster/centos-binary-mariadb:current-tripleo
+        command: ["/bin/bash"]
+        args:
+        - -c
+        - |
+          # Only initialise mysqldb once
+          if [ ! -f /var/lib/mysql/.kolla_bootstrap ]; then
+            kolla_start
+            touch /var/lib/mysql/.kolla_bootstrap
+          fi
         securityContext:
           runAsUser: 0
         volumeMounts:
