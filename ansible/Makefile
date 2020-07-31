@@ -32,7 +32,7 @@ podified-ctlplane:
 	# NOTE: requires 'make olm'
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts \
-	install_namespace.yaml
+	install_namespace.yaml \
 	install_mariadb.yaml \
 	install_rabbitmq.yaml \
 	install_keystone.yaml \
