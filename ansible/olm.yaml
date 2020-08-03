@@ -28,18 +28,15 @@
       dest: "{{ working_bin_dir }}/opm"
       mode: 0755
 
-  - set_fact:
-      repo_dir: "{{ k8s_operators_dir }}/openstack-cluster-operator"
-
-  - name: Clone openstack-k8s-operators with force=yes to be able to rerun
-    git:
-      repo: "{{ base_url }}/openstack-cluster-operator.git"
-      dest: "{{ repo_dir }}"
-      version: "{{ branch }}"
-      force: yes
+  - import_role: name=git_checkout_operator
     vars:
-      base_url: "{{ openstack_k8s_operators_https_url | default('https://github.com/openstack-k8s-operators', true) }}"
-      branch: "{{ openstack_k8s_operators_cluster_branch | default('HEAD', true) }}"
+      operator: openstack-cluster-operator
+
+  - name: Ensure a clean build
+    shell: |
+      make clean
+    args:
+      chdir: "{{ repo_dir }}"
 
   - name: build the csv-merger
     shell: >
