@@ -27,3 +27,8 @@
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: copy stackrc to working dir
+    copy:
+      src: stackrc
+      dest: "{{ working_dir }}/stackrc"
