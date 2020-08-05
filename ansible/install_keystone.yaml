@@ -32,3 +32,23 @@
     copy:
       src: stackrc
       dest: "{{ working_dir }}/stackrc"
+
+  - set_fact:
+      keystone_yaml_dir: "{{ working_yamls_dir }}/keystone"
+
+  - name: Create yaml dir
+    file:
+      path: "{{ keystone_yaml_dir }}"
+      state: directory
+
+  - name: Copy osconfig to {{ keystone_yaml_dir }}
+    copy:
+      src: ocp/keystone/osconfig.yaml
+      dest: "{{ keystone_yaml_dir }}/"
+
+  - name: Create osconfig containing clouds.yaml
+    shell: |
+      oc apply -n openstack -f "{{ keystone_yaml_dir }}"
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
