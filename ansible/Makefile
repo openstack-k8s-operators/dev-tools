@@ -37,7 +37,8 @@ podified-ctlplane:
 	install_rabbitmq.yaml \
 	install_keystone.yaml \
 	install_heat_operator.yaml \
-	install_glance.yaml
+	install_glance.yaml \
+	install_placement.yaml
 
 olm:
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \

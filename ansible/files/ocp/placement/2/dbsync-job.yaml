@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: placement-dbsync
+  namespace: openstack
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      name: placement-dbsync
+      namespace: openstack
+    spec:
+      restartPolicy: Never
+      serviceAccountName: openstack-proto
+      containers:
+        - name: placement-kolla
+          env:
+            - name: KOLLA_CONFIG_STRATEGY
+              value: "COPY_ALWAYS"
+            - name: KOLLA_BOOTSTRAP
+              value: "TRUE"
+          image: tripleotrain/rhel-binary-placement-api:current-tripleo
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+          command:
+            - /bin/bash
+            - -c
+            - |
+              rm -f /etc/httpd/conf.d/ssl.conf && \
+              kolla_start
+          volumeMounts:
+            - mountPath: /var/lib/config-data
+              readOnly: true
+              name: config-data
+            - mountPath: /var/lib/kolla/config_files
+              readOnly: true
+              name: kolla-config
+      volumes:
+        - name: kolla-config
+          configMap:
+            name: placement
+            items:
+              - key: kolla-config.json
+                path: config.json
+        - name: config-data
+          configMap:
+            name: placement
+            defaultMode: 0444
+            items:
+              - key: placement.conf
+                path: placement.conf
+              - key: logging.conf
+                path: logging.conf
+              - key: httpd.conf
+                path: httpd.conf
