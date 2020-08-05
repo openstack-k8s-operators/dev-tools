@@ -12,10 +12,10 @@
       KUBECONFIG: "{{ kubeconfig }}"
     ignore_errors: true
     with_items:
-      - "oc delete csv openstack-cluster-operator.v{{ csv_version }}"
-      - "oc delete subscription openstack-cluster"
-      - "oc delete catalogsource openstack-index"
-      - "oc delete operatorgroup openstack-group"
+      - "oc delete -n openstack csv openstack-cluster-operator.v{{ csv_version }}"
+      - "oc delete -n openstack subscription openstack-cluster"
+      - "oc delete -n openstack catalogsource openstack-index"
+      - "oc delete -n openstack operatorgroup openstack-group"
 
   - name: Cleanup working directory
     file:
