@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: glance-dbcreate
+  namespace: openstack
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      name: glance-dbcreate
+      namespace: openstack
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: mariadb-client
+          image: docker.io/tripleomaster/centos-binary-mariadb:current-tripleo
+          env:
+            - name: MYSQL_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: mariadb-admin
+                  key: DBRootPassword
+          command:
+            - /bin/bash
+            - -c
+            - |
+              mysql -h openstack-db-mariadb.openstack.svc -u root -P 3306 -e "CREATE DATABASE IF NOT EXISTS glance; GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'localhost' IDENTIFIED BY 'password';GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%' IDENTIFIED BY 'password';"
