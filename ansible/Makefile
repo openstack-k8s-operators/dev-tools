@@ -38,7 +38,8 @@ podified-ctlplane:
 	install_keystone.yaml \
 	install_heat_operator.yaml \
 	install_glance.yaml \
-	install_placement.yaml
+	install_placement.yaml \
+	install_ovn.yaml
 
 olm:
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
