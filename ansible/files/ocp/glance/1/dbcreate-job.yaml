@@ -24,4 +24,4 @@ spec:
             - /bin/bash
             - -c
             - |
-              mysql -h openstack-db-mariadb.openstack.svc -u root -P 3306 -e "CREATE DATABASE IF NOT EXISTS glance; GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'localhost' IDENTIFIED BY 'password';GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%' IDENTIFIED BY 'password';"
+              mysql -h mariadb.openstack.svc -u root -P 3306 -e "CREATE DATABASE IF NOT EXISTS glance; GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'localhost' IDENTIFIED BY 'password';GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%' IDENTIFIED BY 'password';"

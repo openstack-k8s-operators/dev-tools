@@ -132,4 +132,4 @@ data:
     auth_type = password
 
     [placement_database]
-    connection = mysql+pymysql://placement:password@openstack-db-mariadb.openstack.svc/placement
+    connection = mysql+pymysql://placement:password@mariadb.openstack.svc/placement
