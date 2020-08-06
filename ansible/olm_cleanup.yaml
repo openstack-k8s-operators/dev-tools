@@ -16,8 +16,3 @@
       - "oc delete -n openstack subscription openstack-cluster"
       - "oc delete -n openstack catalogsource openstack-index"
       - "oc delete -n openstack operatorgroup openstack-group"
-
-  - name: Cleanup working directory
-    file:
-      path: "{{ k8s_operators_dir }}/openstack-cluster-operator"
-      state: absent
