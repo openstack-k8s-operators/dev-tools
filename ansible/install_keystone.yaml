@@ -8,15 +8,9 @@
   - set_fact:
       repo_dir: "{{ k8s_operators_dir }}/keystone-operator"
 
-  - name: Clone openstack-k8s-operators with force=yes to be able to rerun
-    git:
-      repo: "{{ base_url }}/keystone-operator.git"
-      dest: "{{ repo_dir }}"
-      version: "{{ branch }}"
-      force: yes
+  - import_role: name=git_checkout_operator
     vars:
-      base_url: "{{ openstack_k8s_operators_https_url | default('https://github.com/openstack-k8s-operators', true) }}"
-      branch: "{{ openstack_k8s_operators_keystone_branch | default('HEAD', true) }}"
+      operator: keystone-operator
 
   #FIXME: this will soon be automated via keystone-operator
   - name: Add keystone service account to anyuid SCC
@@ -30,6 +24,31 @@
     shell: |
       oc apply -n openstack \
           -f {{ repo_dir }}/deploy/crds/keystone.openstack.org_keystoneapis_cr.yaml
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: copy stackrc to working dir
+    copy:
+      src: stackrc
+      dest: "{{ working_dir }}/stackrc"
+
+  - set_fact:
+      keystone_yaml_dir: "{{ working_yamls_dir }}/keystone"
+
+  - name: Create yaml dir
+    file:
+      path: "{{ keystone_yaml_dir }}"
+      state: directory
+
+  - name: Copy osconfig to {{ keystone_yaml_dir }}
+    copy:
+      src: ocp/keystone/osconfig.yaml
+      dest: "{{ keystone_yaml_dir }}/"
+
+  - name: Create osconfig containing clouds.yaml
+    shell: |
+      oc apply -n openstack -f "{{ keystone_yaml_dir }}"
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"

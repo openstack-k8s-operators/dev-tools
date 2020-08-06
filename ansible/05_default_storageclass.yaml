@@ -16,7 +16,7 @@
 
   tasks:
   - name: Create PVs
-    include_tasks: create_nfs_export.yaml
+    include_tasks: tasks/create_nfs_exports.yaml
     vars:
       exports: "{{ pvs | expand_pvs | list }}"
       group: host-nfs-storageclass

@@ -1,0 +1,37 @@
+---
+- hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+
+  tasks:
+  - set_fact:
+      ovn_yaml_dir: "{{ working_yamls_dir }}/ovn"
+
+  - debug:
+      msg: "yamls will be written to {{ ovn_yaml_dir }} locally"
+
+  - name: Create yaml dir
+    file:
+      path: "{{ ovn_yaml_dir }}"
+      state: directory
+
+  - name: Copy deployment yamls to working dir
+    copy:
+      src: "{{ item }}"
+      dest: "{{ ovn_yaml_dir }}/"
+    with_fileglob:
+    - "files/ocp/ovn/*"
+
+  - name: Deploy OVN
+    shell: |
+      oc apply -f "{{ ovn_yaml_dir }}"
+
+      # Unlike a deployment, you can't wait for a StatefulSet to become
+      # available. For us, it's sufficient that at least 1 node is available.
+      # ovn-ovsdb-0 will always be brought up first.
+      oc wait -n openstack pod/ovn-ovsdb-0 \
+          --for condition=Ready --timeout=120s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"

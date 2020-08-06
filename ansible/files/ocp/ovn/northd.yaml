@@ -1,0 +1,57 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: ovn-northd
+  namespace: openstack
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ovn-northd
+  template:
+    metadata:
+      labels:
+        app: ovn-northd
+        kubernetes.io/os: "linux"
+    spec:
+      containers:
+      # ovn-northd: convert network objects in nbdb to flows in sbdb
+      - name: northd
+        image: "tripleotrain/rhel-binary-ovn-nb-db-server:current-tripleo"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+
+          # Resolve a DNS name to an IP address, allowing that we may be
+          # starting before the service is ready and in DNS
+          resolve() {
+            local retries=0
+            until getent hosts "$1" | \
+                  awk 'NR == 1 { print $1 } END {exit (NR == 0) ? 1 : 0}'
+            do
+              (( retries++ )) && [[ $retries -gt 5 ]] && exit 1
+              sleep $(( 2 ** $retries ))
+            done
+          }
+
+          db0=$(resolve ovn-ovsdb-0.openstack.svc)
+          db1=$(resolve ovn-ovsdb-1.openstack.svc)
+          db2=$(resolve ovn-ovsdb-2.openstack.svc)
+
+          echo "$(date -Iseconds) - starting ovn-northd"
+          exec ovn-northd \
+            --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
+            --ovnnb-db "tcp:${db0}:6641,tcp:${db1}:6641,tcp:${db2}:6641" \
+            --ovnsb-db "tcp:${db0}:6642,tcp:${db1}:6642,tcp:${db2}:6642"
+        env:
+        - name: OVN_LOG_LEVEL
+          value: info 
+        - name: OVS_RUNDIR
+          value: /tmp
+        resources:
+          requests:
+            cpu: 10m
+            memory: 300Mi
+        terminationMessagePolicy: FallbackToLogsOnError

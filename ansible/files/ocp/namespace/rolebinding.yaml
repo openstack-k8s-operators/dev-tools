@@ -1,12 +1,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: openstack-proto-anyuid
+  name: openstack-proto
   namespace: openstack
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: openstack-proto-anyuid
+  name: openstack-proto
 subjects:
 - kind: ServiceAccount
   name: openstack-proto

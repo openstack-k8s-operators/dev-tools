@@ -1,0 +1,13 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: glance
+  namespace: openstack
+spec:
+  host: glance.apps.ostest.test.metalkube.org
+  path: /
+  to:
+    kind: Service
+    name: glance
+  port:
+    targetPort: api

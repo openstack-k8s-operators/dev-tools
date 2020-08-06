@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: placement-service-init
+  namespace: openstack
+data:
+  openstackclient.cmds: |
+    user create --domain default --password foobar123 placement
+    project create service
+    role add --project service --user placement admin
+    service create --name placement --description "Openstack Placement" placement
+    endpoint create --region regionOne placement public http://placement.apps.ostest.test.metalkube.org/
+    endpoint create --region regionOne placement admin http://placement.apps.ostest.test.metalkube.org/
+    endpoint create --region regionOne placement internal http://placement.openstack.svc:8778/
