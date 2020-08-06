@@ -43,7 +43,7 @@
           --patch '{"spec":{"storage":{"pvc":{"claim": "openshift-image-registry-pvc"}}}}'
 
       # wait for image registry to be deployed
-      oc wait --for condition=available -n openshift-image-registry deployment/image-registry
+      oc wait --for condition=available -n openshift-image-registry deployment/image-registry --timeout=60s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
