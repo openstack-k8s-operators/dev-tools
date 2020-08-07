@@ -5,13 +5,6 @@
   - oc_local
 
   tasks:
-  - set_fact:
-      repo_dir: "{{ k8s_operators_dir }}/keystone-operator"
-
-  - import_role: name=git_checkout_operator
-    vars:
-      operator: keystone-operator
-
   #FIXME: this will soon be automated via keystone-operator
   - name: Add keystone service account to anyuid SCC
     shell: |
@@ -20,10 +13,21 @@
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
 
-  - name: create keystone CR
+  - name: Create yaml dir
+    import_role: name=working_yaml_dir
+    vars:
+      name: keystone
+
+  - name: Copy files to yaml dir
+    copy:
+      src: "{{ item }}"
+      dest: "{{ keystone_yaml_dir }}/"
+    with_fileglob:
+    - "ocp/keystone/*"
+
+  - name: create keystone CR and osconfig
     shell: |
-      oc apply -n openstack \
-          -f {{ repo_dir }}/deploy/crds/keystone.openstack.org_keystoneapis_cr.yaml
+      oc apply -n openstack -f "{{ keystone_yaml_dir }}"
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
@@ -33,22 +37,20 @@
       src: stackrc
       dest: "{{ working_dir }}/stackrc"
 
-  - set_fact:
-      keystone_yaml_dir: "{{ working_yamls_dir }}/keystone"
-
-  - name: Create yaml dir
-    file:
-      path: "{{ keystone_yaml_dir }}"
-      state: directory
-
-  - name: Copy osconfig to {{ keystone_yaml_dir }}
-    copy:
-      src: ocp/keystone/osconfig.yaml
-      dest: "{{ keystone_yaml_dir }}/"
-
-  - name: Create osconfig containing clouds.yaml
+  - name: Wait for deployment to be created
     shell: |
-      oc apply -n openstack -f "{{ keystone_yaml_dir }}"
+      oc get -n openstack deployment/keystone
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+    register: keystone_deployment_creation
+    until: keystone_deployment_creation is not failed
+    retries: 20
+    delay: 5
+
+  - name: Wait for deployment
+    shell: |
+      oc wait -n openstack deployment/keystone --for condition=Available --timeout 120s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
