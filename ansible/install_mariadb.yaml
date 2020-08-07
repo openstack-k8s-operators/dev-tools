@@ -5,23 +5,32 @@
   - oc_local
 
   tasks:
-  - set_fact:
-      repo_dir: "{{ k8s_operators_dir }}/mariadb-operator"
-
-  - name: Clone openstack-k8s-operators with force=yes to be able to rerun
-    git:
-      repo: "{{ base_url }}/mariadb-operator.git"
-      dest: "{{ repo_dir }}"
-      version: "{{ branch }}"
-      force: yes
+  - import_role: name=git_checkout_operator
     vars:
-      base_url: "{{ openstack_k8s_operators_https_url | default('https://github.com/openstack-k8s-operators', true) }}"
-      branch: "{{ openstack_k8s_operators_mariadb_branch | default('HEAD', true) }}"
+      operator: mariadb-operator
 
   - name: create mariadb CR
     shell: |
       oc apply -n openstack \
           -f {{ repo_dir }}/config/samples/database_v1beta1_mariadb.yaml
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Create yaml dir
+    import_role: name=working_yaml_dir
+    vars:
+      name: mariadb
+
+  - name: Create db root password secret
+    shell: |
+      set -e
+
+      password=$(oc get -n openstack mariadb/mariadb -o json | jq -r '.spec.rootPassword')
+      oc create secret generic -n openstack mariadb-admin --dry-run -o yaml \
+          --from-literal=DBRootPassword="${password}" > "{{ mariadb_yaml_dir }}/root-pwd.yaml"
+
+      oc apply -n openstack -f "{{ mariadb_yaml_dir }}"
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
@@ -34,6 +43,17 @@
     loop:
     - mysql-admin
     - mysql-db
+
+  - name: Wait for mariadb pod creation
+    shell: |
+      oc get -n openstack pod/mariadb
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+    register: mariadb_pod_creation
+    until: mariadb_pod_creation is not failed
+    retries: 20
+    delay: 5
 
   - name: Wait for deployment
     shell: |

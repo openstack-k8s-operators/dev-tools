@@ -6,49 +6,55 @@ default: \
 
 all: default
 
+hosts:
+	echo -e "localhost ansible_connection=local\n\n[convergence_base]\nlocalhost" > $@
+
+local-defaults.yaml:
+	touch $@
+
 local-deps:
 	ansible-galaxy install -r requirements.yml
 
-ocp_install: local-deps
+ocp_install: local-deps local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
-	-i hosts \
+	-i hosts -e @local-defaults.yaml \
 	01_prepare_host.yaml \
 	03_ocp_dev_scripts.yaml \
 	04_local_oc_client.yaml \
 	05_default_storageclass.yaml \
 	ocp_image_registry.yaml \
 
-osp_operators_install:
+osp_operators_install: local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
-	-i hosts \
+	-i hosts -e @local-defaults.yaml \
 	12_setup_worker_osp_machineset.yaml \
 
-osp_tests_run:
+osp_tests_run: local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
-	-i hosts \
+	-i hosts -e @local-defaults.yaml \
   20_tempest_ocp.yaml \
 
-podified-ctlplane:
+podified-ctlplane: ctlplane
+ctlplane: local-defaults.yaml
 	# NOTE: requires 'make olm'
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
-	-i hosts \
+	-i hosts -e @local-defaults.yaml \
 	install_namespace.yaml \
 	install_mariadb.yaml \
 	install_rabbitmq.yaml \
 	install_keystone.yaml \
-	install_heat_operator.yaml \
 	install_glance.yaml \
 	install_placement.yaml \
 	install_ovn.yaml
 
-olm:
+olm: local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
-	-v -i hosts \
+	-v -i hosts -e @local-defaults.yaml \
 	olm.yaml
 
-olm_cleanup:
+olm_cleanup: local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
-	-v -i hosts \
+	-v -i hosts -e @local-defaults.yaml \
 	olm_cleanup.yaml
 
 # XXX: WARNING!!! WARNING!!! DANGER WILL ROBINSON!!!
