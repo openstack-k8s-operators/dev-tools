@@ -1,3 +1,5 @@
 # Secrets which should never be pushed
-files/pull-secret
-vars/rhel-subscription.yaml
+/files/pull-secret
+/vars/rhel-subscription.yaml
+/local-defaults.yaml
+/hosts
