@@ -5,7 +5,7 @@
 set -e
 
 namespace=openstack
-service=openstack-db-mariadb
+service=mariadb
 secret=mariadb-admin
 field=DBRootPassword
 

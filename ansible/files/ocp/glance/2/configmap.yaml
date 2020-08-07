@@ -21,7 +21,7 @@ data:
     log_config_append=/etc/glance/logging.conf
 
     [database]
-    connection=mysql+pymysql://glance:password@openstack-db-mariadb.openstack.svc/glance
+    connection=mysql+pymysql://glance:password@mariadb.openstack.svc/glance
 
     [file]
     filesystem_store_datadir = /var/lib/glance/images
