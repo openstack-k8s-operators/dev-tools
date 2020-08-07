@@ -43,7 +43,6 @@ ctlplane: local-defaults.yaml
 	install_mariadb.yaml \
 	install_rabbitmq.yaml \
 	install_keystone.yaml \
-	install_heat_operator.yaml \
 	install_glance.yaml \
 	install_placement.yaml \
 	install_ovn.yaml
