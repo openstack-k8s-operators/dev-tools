@@ -26,6 +26,17 @@
     - mysql-admin
     - mysql-db
 
+  - name: Wait for mariadb pod creation
+    shell: |
+      oc get -n openstack pod/mariadb
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+    register: mariadb_pod_creation
+    until: mariadb_pod_creation is not failed
+    retries: 20
+    delay: 5
+
   - name: Wait for deployment
     shell: |
       oc wait -n openstack pod/mariadb --for condition=ready --timeout=60s
