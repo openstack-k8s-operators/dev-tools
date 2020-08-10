@@ -16,7 +16,7 @@ data:
     workers=3
     image_cache_dir=/var/lib/glance/image-cache
     registry_host=0.0.0.0
-    transport_url=rabbit://guest:foobar123@openstack-rabbitmq.openstack.svc:5672/?ssl=0
+    transport_url=rabbit://osp:passw0rd@rabbitmq.openstack.svc:5672/?ssl=0
     enable_v1_api=False
     log_config_append=/etc/glance/logging.conf
 
@@ -42,7 +42,7 @@ data:
 
     [oslo_messaging_notifications]
     driver=messagingv2
-    transport_url=rabbit://guest:foobar123@openstack-rabbitmq.openstack.svc:5672/?ssl=0
+    transport_url=rabbit://osp:passw0rd@rabbitmq.openstack.svc:5672/?ssl=0
 
     [oslo_middleware]
     enable_proxy_headers_parsing=True

@@ -12,3 +12,8 @@ rules:
   - securitycontextconstraints
   verbs:
   - use
+
+# For rabbitmq's rabbitmq_peer_discovery_k8s plugin
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get"]
