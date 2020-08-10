@@ -10,7 +10,7 @@ hosts:
 	echo -e "localhost ansible_connection=local\n\n[convergence_base]\nlocalhost" > $@
 
 local-defaults.yaml:
-	touch $@
+	echo -e "vars:" > $@
 
 local-deps:
 	ansible-galaxy install -r requirements.yml
