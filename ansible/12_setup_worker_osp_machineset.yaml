@@ -94,7 +94,7 @@
       environment:
         PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
         KUBECONFIG: "{{base_path}}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-      loop: "{{ range(0, worker_replicas , 1)|list }}"
+      loop: "{{ range(0, worker_replicas.stdout|int , 1)|list }}"
 
     - name: scale up osp worker nodes by {{ osp_compute_scale }}
       become_user: ocp
