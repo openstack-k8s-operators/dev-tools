@@ -15,7 +15,7 @@ local-defaults.yaml:
 local-deps:
 	ansible-galaxy install -r requirements.yml
 
-ocp_install: local-deps local-defaults.yaml
+ocp_install: hosts local-deps local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
 	01_prepare_host.yaml \
@@ -24,17 +24,17 @@ ocp_install: local-deps local-defaults.yaml
 	05_default_storageclass.yaml \
 	ocp_image_registry.yaml \
 
-osp_operators_install: local-defaults.yaml
+osp_operators_install: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
 	12_setup_worker_osp_machineset.yaml \
 
-osp_tests_run: local-defaults.yaml
+osp_tests_run: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
   20_tempest_ocp.yaml \
 
-podified-ctlplane: ctlplane
+podified-ctlplane: hosts ctlplane
 ctlplane: local-defaults.yaml
 	# NOTE: requires 'make olm'
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
@@ -47,12 +47,13 @@ ctlplane: local-defaults.yaml
 	install_placement.yaml \
 	install_ovn.yaml
 
-olm: local-defaults.yaml
+olm: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-v -i hosts -e @local-defaults.yaml \
+	install_namespace.yaml \
 	olm.yaml
 
-olm_cleanup: local-defaults.yaml
+olm_cleanup: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-v -i hosts -e @local-defaults.yaml \
 	olm_cleanup.yaml
