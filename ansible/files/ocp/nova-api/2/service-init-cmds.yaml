@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nova-api-service-init
+  namespace: openstack
+data:
+  openstackclient.cmds: |
+    user create --domain default --password foobar123 nova_api
+    project create service
+    role add --project service --user nova_api admin
+    service create --name nova --description "Openstack Compute" compute
+    endpoint create --region regionOne nova public http://nova.apps.ostest.test.metalkube.org/
+    endpoint create --region regionOne nova admin http://nova.apps.ostest.test.metalkube.org/
+    endpoint create --region regionOne nova internal http://nova-api.openstack.svc:8774/

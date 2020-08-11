@@ -1,0 +1,79 @@
+---
+- hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+
+  tasks:
+  - set_fact:
+      nova_yaml_dir: "{{ working_yamls_dir }}/nova-api"
+
+  - debug:
+      msg: "yamls will be written to {{ nova_yaml_dir }} locally"
+
+  - name: Create yaml dir
+    file:
+      path: "{{ nova_yaml_dir }}"
+      state: directory
+
+  - name: Copy deployment yamls to working dir
+    copy:
+      src: "{{ item }}"
+      dest: "{{ nova_yaml_dir }}/"
+    loop:
+    - "ocp/nova-api/1"
+    - "ocp/nova-api/2"
+    - "ocp/nova-api/3"
+    - "ocp/nova-api/4"
+
+  - name: Create database
+    shell: |
+      set -e
+
+      oc apply -f "{{ nova_yaml_dir }}/1/"
+      oc wait -n openstack job/nova-api-dbcreate-api \
+          --for condition=Complete --timeout=60s
+      oc wait -n openstack job/nova-api-dbcreate-cell0 \
+          --for condition=Complete --timeout=60s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Create db schema
+    shell: |
+      set -e
+
+      oc apply -f "{{ nova_yaml_dir }}/2/"
+      oc wait -n openstack job/nova-api-dbsync \
+          --for condition=Complete --timeout=60s
+      oc wait -n openstack job/nova-api-service-init \
+          --for condition=Complete --timeout=60s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Map cell0
+    shell: |
+      set -e
+
+      oc apply -f "{{ nova_yaml_dir }}/3/"
+      oc wait -n openstack job/nova-api-map-cell0 \
+          --for condition=Complete --timeout=60s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Start nova-api services
+    shell: |
+      set -e
+
+      oc apply -f "{{ nova_yaml_dir }}/4/"
+      oc wait -n openstack deployment/nova-api \
+          --for condition=available --timeout=60s
+      oc wait -n openstack deployment/nova-api-scheduler \
+          --for condition=available --timeout=60s
+      oc wait -n openstack deployment/nova-api-super-conductor \
+          --for condition=available --timeout=60s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"

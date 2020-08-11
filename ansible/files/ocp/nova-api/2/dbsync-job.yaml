@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: &name nova-api-dbsync
+  namespace: &namespace openstack
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      name: *name
+      namespace: *namespace
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: nova-api-kolla
+          env:
+            - name: KOLLA_CONFIG_STRATEGY
+              value: "COPY_ALWAYS"
+            - name: KOLLA_BOOTSTRAP
+              value: "TRUE"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - mountPath: /var/lib/config-data
+              readOnly: true
+              name: config-data
+            - mountPath: /var/lib/kolla/config_files
+              readOnly: true
+              name: kolla-config
+          image: tripleotrain/rhel-binary-nova-api:current-tripleo
+      volumes:
+        - name: kolla-config
+          configMap:
+            name: nova-api
+            items:
+              - key: kolla-config-api.json
+                path: config.json
+        - name: config-data
+          configMap:
+            name: nova-api
+            defaultMode: 0444
+            items:
+              - key: nova.conf
+                path: nova.conf
+              - key: logging.conf
+                path: logging.conf

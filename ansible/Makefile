@@ -46,7 +46,8 @@ ctlplane: local-defaults.yaml
 	install_glance.yaml \
 	install_placement.yaml \
 	install_ovn.yaml \
-	install_neutron-api.yaml
+	install_neutron-api.yaml \
+	install_nova-api.yaml
 
 olm: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
