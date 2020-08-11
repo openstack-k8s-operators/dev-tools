@@ -1,0 +1,61 @@
+---
+- hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+
+  tasks:
+  - set_fact:
+      neutron_yaml_dir: "{{ working_yamls_dir }}/neutron-api"
+
+  - debug:
+      msg: "yamls will be written to {{ neutron_yaml_dir }} locally"
+
+  - name: Create yaml dir
+    file:
+      path: "{{ neutron_yaml_dir }}"
+      state: directory
+
+  - name: Copy deployment yamls to working dir
+    copy:
+      src: "{{ item }}"
+      dest: "{{ neutron_yaml_dir }}/"
+    loop:
+    - "ocp/neutron-api/1"
+    - "ocp/neutron-api/2"
+    - "ocp/neutron-api/3"
+
+  - name: Create database
+    shell: |
+      set -e
+
+      oc apply -f "{{ neutron_yaml_dir }}/1/"
+      oc wait -n openstack job/neutron-api-dbcreate \
+          --for condition=Complete --timeout=60s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Create db schema
+    shell: |
+      set -e
+
+      oc apply -f "{{ neutron_yaml_dir }}/2/"
+      oc wait -n openstack job/neutron-api-dbsync \
+          --for condition=Complete --timeout=60s
+      oc wait -n openstack job/neutron-api-service-init \
+          --for condition=Complete --timeout=60s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Start neutron-api
+    shell: |
+      set -e
+
+      oc apply -f "{{ neutron_yaml_dir }}/3/"
+      oc wait -n openstack deployment/neutron-api \
+          --for condition=available --timeout=60s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"

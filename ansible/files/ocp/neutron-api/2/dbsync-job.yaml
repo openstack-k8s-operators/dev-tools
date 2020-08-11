@@ -1,0 +1,62 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: &name neutron-api-dbsync
+  namespace: &namespace openstack
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      name: *name
+      namespace: *namespace
+    spec:
+      serviceAccountName: openstack-proto
+      restartPolicy: Never
+      containers:
+        - name: neutron-kolla
+          env:
+            - name: KOLLA_CONFIG_STRATEGY
+              value: "COPY_ALWAYS"
+            - name: KOLLA_BOOTSTRAP
+              value: "TRUE"
+          image: tripleotrain/rhel-binary-neutron-server-ovn:current-tripleo
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              kolla_set_configs
+              kolla_start 
+
+              # XXX(mdbooth): The kolla action appears to be incomplete.
+              # Specifically it will fail to initialise tables required by the
+              # OVN driver.
+              OPTS="--config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugins/ml2/ml2_conf.ini"
+              neutron-db-manage ${OPTS} upgrade heads
+          volumeMounts:
+            - mountPath: /var/lib/config-data
+              readOnly: true
+              name: config-data
+            - mountPath: /var/lib/kolla/config_files
+              readOnly: true
+              name: kolla-config
+      volumes:
+        - name: kolla-config
+          configMap:
+            name: neutron-api
+            items:
+              - key: kolla-config.json
+                path: config.json
+        - name: config-data
+          configMap:
+            name: neutron-api
+            defaultMode: 0444
+            items:
+              - key: neutron.conf
+                path: neutron.conf
+              - key: logging.conf
+                path: logging.conf
