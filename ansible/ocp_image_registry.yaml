@@ -41,9 +41,25 @@
       # configure storage pvc for openshift-image-registry
       oc patch configs.imageregistry.operator.openshift.io/cluster --type merge \
           --patch '{"spec":{"storage":{"pvc":{"claim": "openshift-image-registry-pvc"}}}}'
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
 
-      # wait for image registry to be deployed
-      oc wait --for condition=available -n openshift-image-registry deployment/image-registry --timeout=360s
+  - name: wait for deployment to be created
+    shell: |
+      oc get -n openshift-image-registry deployment/image-registry
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+    register: image_registry_deployment
+    until: image_registry_deployment is not failed
+    retries: 20
+    delay: 5
+
+  - name: wait for image registry to be deployed
+    shell: |
+      set -e
+      oc wait --for condition=available -n openshift-image-registry deployment/image-registry --timeout=120s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
