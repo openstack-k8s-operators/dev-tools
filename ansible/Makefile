@@ -50,6 +50,7 @@ ctlplane: local-defaults.yaml
 olm: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-v -i hosts -e @local-defaults.yaml \
+	install_namespace.yaml \
 	olm.yaml
 
 olm_cleanup: hosts local-defaults.yaml
