@@ -44,13 +44,10 @@
     args:
       chdir: "{{ repo_dir }}"
 
-  # XXX: This may not rebuild correctly as 'creates' only tests existence.
-  #      Consider rewriting this as a make target
   - name: build CSV manifest locally
     command: /bin/bash "{{ repo_dir }}/scripts/build-manifests.sh"
     args:
       chdir: "{{ repo_dir }}"
-      creates: "{{ repo_dir }}/deploy/olm-catalog/openstack-cluster/{{csv_version}}/openstack-cluster-operator.v{{csv_version}}.clusterserviceversion.yaml"
     environment:
       CSV_VERSION: "{{csv_version}}"
       OPERATOR_IMAGE: "{{cluster_operator_image}}"
