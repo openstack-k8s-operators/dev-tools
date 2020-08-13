@@ -64,10 +64,14 @@ olm_cleanup: hosts local-defaults.yaml
 # Unlike the ansible playbooks, the following all assume you're executing this
 # directly on the host.
 
-clean: ocp_cleanup host_cleanup
+clean: ocp_cleanup host_cleanup nfs_pvc_cleanup
 
 host_cleanup:
 	-echo | sudo tee /etc/exports
+
+nfs_pvc_cleanup:
+        -NFS_DATA_DIR=$$(grep nfs_data_dir ./vars/default.yaml |awk -F":" '{print $$2}') ;\
+        sudo su - root -c "find $$NFS_DATA_DIR -type d -name 'pv-*' -delete"
 
 ocp_cleanup:
 	-sudo su - ocp -c "cd dev-scripts && make clean"
