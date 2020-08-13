@@ -150,6 +150,7 @@
 
   - name: run dev-script
     shell: |
+      set -o pipefail
       export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
       make 2>&1 | tee ~/dev-script.log
     args:
