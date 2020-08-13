@@ -9,18 +9,17 @@
     vars:
       operator: mariadb-operator
 
-  - name: create mariadb CR
-    shell: |
-      oc apply -n openstack \
-          -f {{ repo_dir }}/config/samples/database_v1beta1_mariadb.yaml
-    environment:
-      PATH: "{{ oc_env_path }}"
-      KUBECONFIG: "{{ kubeconfig }}"
-
   - name: Create yaml dir
     import_role: name=working_yaml_dir
     vars:
       name: mariadb
+
+  - name: Copy files to yaml dir
+    copy:
+      src: "{{ item }}"
+      dest: "{{ keystone_yaml_dir }}/"
+    with_fileglob:
+    - "ocp/mariadb/*"
 
   - name: Create db root password secret
     shell: |
