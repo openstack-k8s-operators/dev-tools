@@ -56,6 +56,7 @@
       COMPUTE_WORKER_IMAGE: "{{compute_node_operator_image}}"
       KEYSTONE_IMAGE: "{{keystone_operator_image}}"
       MARIADB_IMAGE: "{{mariadb_operator_image}}"
+      GLANCE_IMAGE: "{{glance_operator_image}}"
 
   - name: switch to openstack project/namespace
     shell: >
