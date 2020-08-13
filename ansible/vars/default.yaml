@@ -84,3 +84,6 @@ local_working_dir: "~/{{ ocp_cluster_name }}-working"
 # nfs export directory
 nfs_data_dir: /home/nfs/data
 nfs_export_dir: /home/nfs
+
+# number of OCP worker nodes should be OSP compute hosts
+osp_compute_scale: 1
