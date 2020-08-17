@@ -28,8 +28,25 @@
   - name: Create database
     shell: |
       set -e
-
       oc apply -f "{{ glance_yaml_dir }}/1/"
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: wait for job/glance-dbcreate to be created
+    shell: |
+      oc get -n openstack job/glance-dbcreate
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+    register: glance_dbcreate_deployment
+    until: glance_dbcreate_deployment is not failed
+    retries: 10
+    delay: 5
+
+  - name: wait for job/glance-dbcreate
+    shell: |
+      set -e
       oc wait -n openstack job/glance-dbcreate \
           --for condition=Complete --timeout=60s
     environment:
@@ -39,8 +56,25 @@
   - name: Create db schema
     shell: |
       set -e
-
       oc apply -f "{{ glance_yaml_dir }}/2/"
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: wait for job/glance-service-init to be created
+    shell: |
+      oc get -n openstack job/glance-service-init
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+    register: glance_service_init_deployment
+    until: glance_service_init_deployment is not failed
+    retries: 10
+    delay: 5
+
+  - name: wait for glance-dbsync and glance-service-init
+    shell: |
+      set -e
       oc wait -n openstack job/glance-dbsync \
           --for condition=Complete --timeout=60s
       oc wait -n openstack job/glance-service-init \
@@ -52,8 +86,25 @@
   - name: Start glance
     shell: |
       set -e
-
       oc apply -f "{{ glance_yaml_dir }}/3/"
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: wait for glance deployment to be created
+    shell: |
+      oc get -n openstack deployment/glance
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+    register: glance_service_init_deployment
+    until: glance_service_init_deployment is not failed
+    retries: 10
+    delay: 5
+
+  - name: wait for glance to be deployed
+    shell: |
+      set -e
       oc wait -n openstack deployment/glance \
           --for condition=available --timeout=60s
     environment:
