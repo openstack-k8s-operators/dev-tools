@@ -14,11 +14,14 @@ password=$1 && shift
 namespace=openstack
 service=mariadb
 
+# pod name must be a valid DNS name
+pod_name=$(echo "mariadb-client-$db" | sed "s/_/-/")
+
 cmd="mysql -h $service -P 3306 -u${user} -p${password} ${db}"
 
 export KUBECONFIG="{{ kubeconfig }}"
 
-exec oc run mariadb-client-$db --rm --tty -i \
+exec oc run $pod_name --rm --tty -i \
         --restart='Never' --namespace $namespace \
         --image docker.io/tripleomaster/centos-binary-mariadb:current-tripleo \
         --command -- ${cmd}
