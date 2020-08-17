@@ -1,0 +1,131 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nova-api
+  namespace: openstack
+data:
+  kolla-config-api.json: |
+    {
+      "command": "/usr/bin/nova-api-os-compute --config-file /etc/nova/nova.conf",
+      "config_files": [
+        {
+          "source": "/var/lib/config-data/nova.conf",
+          "dest": "/etc/nova/nova.conf",
+          "owner": "nova",
+          "perm": "0600"
+        },
+        {
+          "source": "/var/lib/config-data/logging.conf",
+          "dest": "/etc/nova/logging.conf",
+          "owner": "nova",
+          "perm": "0600"
+        }
+      ]
+    }
+  kolla-config-scheduler.json: |
+    {
+      "command": "/usr/bin/nova-scheduler --config-file /etc/nova/nova.conf",
+      "config_files": [
+        {
+          "source": "/var/lib/config-data/nova.conf",
+          "dest": "/etc/nova/nova.conf",
+          "owner": "nova",
+          "perm": "0600"
+        },
+        {
+          "source": "/var/lib/config-data/logging.conf",
+          "dest": "/etc/nova/logging.conf",
+          "owner": "nova",
+          "perm": "0600"
+        }
+      ]
+    }
+  kolla-config-super-conductor.json: |
+    {
+      "command": "/usr/bin/nova-conductor --config-file /etc/nova/nova.conf",
+      "config_files": [
+        {
+          "source": "/var/lib/config-data/nova.conf",
+          "dest": "/etc/nova/nova.conf",
+          "owner": "nova",
+          "perm": "0600"
+        },
+        {
+          "source": "/var/lib/config-data/logging.conf",
+          "dest": "/etc/nova/logging.conf",
+          "owner": "nova",
+          "perm": "0600"
+        }
+      ]
+    }
+  logging.conf: |
+    [loggers]
+    keys=root
+
+    [handlers]
+    keys=stdout
+
+    [formatters]
+    keys=normal
+
+
+    ###########
+    # Loggers #
+    ###########
+
+    [logger_root]
+    level=INFO
+    handlers=stdout
+
+    ################
+    # Log Handlers #
+    ################
+
+    [handler_stdout]
+    class=StreamHandler
+    level=INFO
+    formatter=normal
+    args=(sys.stdout,)
+
+    ##################
+    # Log Formatters #
+    ##################
+
+    [formatter_normal]
+    format=(%(name)s): %(asctime)s %(levelname)s %(message)s
+  nova.conf: |
+    [DEFAULT]
+    enabled_apis = osapi_compute
+    transport_url = rabbit://osp:passw0rd@rabbitmq.openstack.svc.cluster.local:5672/?ssl=0
+    log_config_append=/etc/nova/logging.conf
+
+    [api_database]
+    connection = mysql+pymysql://nova:password@mariadb.openstack.svc.cluster.local/nova_api
+
+    [database]
+    connection = mysql+pymysql://nova:password@mariadb.openstack.svc.cluster.local/nova_cell0
+
+    [api]
+    auth_strategy = keystone
+
+    [keystone_authtoken]
+    www_authenticate_uri = http://keystone.apps.ostest.test.metalkube.org/
+    auth_url = http://keystone.openstack.svc:5000/
+    # XXX(mdbooth): Add memcached
+    #memcached_servers = controller:11211
+    auth_type = password
+    project_domain_name = Default
+    user_domain_name = Default
+    project_name = service
+    username = nova_api
+    password = foobar123
+
+    [placement]
+    region_name = regionOne
+    project_domain_name = Default
+    project_name = service
+    auth_type = password
+    user_domain_name = Default
+    auth_url = http://keystone.openstack.svc:5000/
+    username = placement
+    password = foobar123

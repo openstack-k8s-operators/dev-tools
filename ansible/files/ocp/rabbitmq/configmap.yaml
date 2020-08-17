@@ -9,14 +9,32 @@ data:
         "command": "/usr/lib/rabbitmq/bin/rabbitmq-server",
         "config_files": [
             {
-                "source": "/var/lib/config-data/rabbitmq.config",
-                "dest": "/etc/rabbitmq/rabbitmq.config",
+                "source": "/var/lib/config-data/rabbitmq.conf",
+                "dest": "/etc/rabbitmq/rabbitmq.conf",
+                "owner": "rabbitmq",
+                "perm": "0600"
+            },
+            {
+                "source": "/var/lib/config-data/advanced.config",
+                "dest": "/etc/rabbitmq/advanced.config",
+                "owner": "rabbitmq",
+                "perm": "0600"
+            },
+            {
+                "source": "/var/lib/config-data/enabled_plugins",
+                "dest": "/etc/rabbitmq/enabled_plugins",
                 "owner": "rabbitmq",
                 "perm": "0600"
             },
             {
                 "source": "/var/lib/config-data/rabbitmq-env.conf",
                 "dest": "/etc/rabbitmq/rabbitmq-env.conf",
+                "owner": "rabbitmq",
+                "perm": "0600"
+            },
+            {
+                "source": "/var/lib/rabbitmq-cluster/cookie",
+                "dest": "/var/lib/rabbitmq/.erlang.cookie",
                 "owner": "rabbitmq",
                 "perm": "0600"
             }
@@ -29,50 +47,48 @@ data:
             }
         ]
     }
-  #inetrc: ""
-  rabbitmq.config: |
+  enabled_plugins: |
+    [rabbitmq_peer_discovery_k8s, rabbitmq_management, rabbitmq_prometheus].
+  rabbitmq.conf: |
+    cluster_formation.peer_discovery_backend = k8s
+    cluster_formation.k8s.host = kubernetes.default.svc.cluster.local
+    cluster_formation.k8s.address_type = hostname
+    cluster_formation.k8s.service_name = rabbitmq-cluster
+    cluster_formation.k8s.hostname_suffix = .rabbitmq-cluster.openstack.svc.cluster.local
+
+    queue_master_locator=min-masters
+
+    tcp_listen_options.keepalive = true
+    tcp_listen_options.backlog = 128
+    tcp_listen_options.nodelay = true
+    tcp_listen_options.linger.on = true
+    tcp_listen_options.linger.timeout = 0
+    tcp_listen_options.exit_on_close = false
+
+    listeners.tcp.default = 5672
+
+    log.console = true
+    log.console.level = debug
+    log.file = false
+
+    collect_statistics_interval = 30000
+
+    management.rates_mode = none
+    management.tcp.port = 15672
+    management.tcp.ip = 127.0.0.1
+
+    default_user = admin
+    default_pass = admin
+    loopback_users.admin = true
+  advanced.config: |
     [
-      {rabbit, [
-        {loopback_users, []},
-        {tcp_listen_options, [
-             {keepalive,     true},
-             {backlog,       128},
-             {nodelay,       true},
-             {linger,        {true, 0}},
-             {exit_on_close, false}
-        ]},
-        {tcp_listeners, [{"0.0.0.0", 5672}]},
-        {log, [
-            {console, [{enabled, true},
-                       {level, info}
-            ]}
-        ]},
-        {collect_statistics_interval, 30000},
-        {cluster_partition_handling, ignore},
-        {queue_master_locator, <<"min-masters">>},
-        {default_user, <<"guest">>},
-        {default_pass, <<"yQ7ot2HdFDAG9q6VSim6a87VW">>}
-      ]},
       {kernel, [
         {inet_dist_listen_max, 25672},
         {inet_dist_listen_min, 25672},
         {net_ticktime, 15}
       ]}
-    ,
-      {rabbitmq_management, [
-        {rates_mode, none}
-    ,    {listener, [
-          {ip, "127.0.0.1"},
-          {port, 15672}
-        ]}
-      ]}
     ].
   rabbitmq-env.conf: |
-    LANG=en_US.UTF-8
-    LC_ALL=en_US.UTF-8
-    NODE_IP_ADDRESS=
-    NODE_PORT=
-    RABBITMQ_NODENAME=rabbit@localhost
     RABBITMQ_SERVER_ERL_ARGS='+K true +P 1048576 -kernel inet_default_connect_options [{nodelay,true}]'
     RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS='+sbwt none'
-    #export ERL_INETRC=/etc/rabbitmq/inetrc
+    RABBITMQ_USE_LONGNAME=true

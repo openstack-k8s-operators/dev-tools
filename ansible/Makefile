@@ -22,7 +22,7 @@ ocp_install: hosts local-deps local-defaults.yaml
 	03_ocp_dev_scripts.yaml \
 	04_local_oc_client.yaml \
 	05_default_storageclass.yaml \
-	ocp_image_registry.yaml \
+	ocp_image_registry.yaml
 
 osp_operators_install: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
@@ -45,7 +45,10 @@ ctlplane: local-defaults.yaml
 	install_keystone.yaml \
 	install_glance.yaml \
 	install_placement.yaml \
-	install_ovn.yaml
+	install_ovn.yaml \
+	install_neutron-api.yaml \
+	install_nova-api.yaml \
+	install_nova-cell.yaml
 
 olm: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \

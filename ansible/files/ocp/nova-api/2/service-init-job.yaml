@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: &name nova-api-service-init
+  namespace: &namespace openstack
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      name: *name
+      namespace: *namespace
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: openstack-client
+          image: quay.io/mbooth/openstack-client:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              openstack < /openstackclient/openstackclient.cmds
+          env:
+            - name: OS_CLOUD
+              valueFrom:
+                configMapKeyRef:
+                  name: osconfig
+                  key: OS_CLOUD
+          volumeMounts:
+            - mountPath: /etc/openstack
+              readOnly: true
+              name: osconfig
+            - mountPath: /openstackclient
+              readOnly: true
+              name: openstackclient-cmds
+      volumes:
+        - name: osconfig
+          configMap:
+            name: osconfig
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
+                mode: 0444
+        - name: openstackclient-cmds
+          configMap:
+            name: nova-api-service-init
+            items:
+              - key: openstackclient.cmds
+                path: openstackclient.cmds
+                mode: 0444

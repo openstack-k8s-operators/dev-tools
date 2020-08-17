@@ -76,9 +76,6 @@ tempest_timeout: 3600
 tempest_whitelist:
   - 'tempest.api.compute.servers.test_create_server.ServersTestJSON.test_list_servers'
 
-# worker that will host the storage for rabbitmq
-rabbitmq_storage_worker: worker-0
-
 local_working_dir: "~/{{ ocp_cluster_name }}-working"
 
 # nfs export directory

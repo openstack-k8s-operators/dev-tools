@@ -1,0 +1,12 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: neutron-api
+spec:
+  host: neutron.apps.ostest.test.metalkube.org
+  path: /
+  to:
+    kind: Service
+    name: neutron-api
+  port:
+    targetPort: api
