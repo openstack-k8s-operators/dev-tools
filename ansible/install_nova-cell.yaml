@@ -1,0 +1,63 @@
+---
+- hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+
+  tasks:
+  - set_fact:
+      nova_yaml_dir: "{{ working_yamls_dir }}/nova-cell"
+
+  - debug:
+      msg: "yamls will be written to {{ nova_yaml_dir }} locally"
+
+  - name: Create yaml dir
+    file:
+      path: "{{ nova_yaml_dir }}"
+      state: directory
+
+  - name: Copy deployment yamls to working dir
+    copy:
+      src: "{{ item }}"
+      dest: "{{ nova_yaml_dir }}/"
+    loop:
+    - "ocp/nova-cell/1"
+    - "ocp/nova-cell/2"
+    - "ocp/nova-cell/3"
+
+  - name: Create database
+    shell: |
+      set -e
+
+      oc apply -f "{{ nova_yaml_dir }}/1/"
+      oc wait -n openstack job/nova-cell1-dbcreate \
+          --for condition=Complete --timeout=60s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Create db schema
+    shell: |
+      set -e
+
+      oc apply -f "{{ nova_yaml_dir }}/2/"
+      oc wait -n openstack job/nova-cell1-dbsync \
+          --for condition=Complete --timeout=60s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Start nova-api services
+    shell: |
+      set -e
+
+      oc apply -f "{{ nova_yaml_dir }}/3/"
+      oc wait -n openstack deployment/nova-cell1-conductor \
+          --for condition=available --timeout=60s
+      oc wait -n openstack deployment/nova-cell1-metadata \
+          --for condition=available --timeout=60s
+      oc wait -n openstack deployment/nova-cell1-novncproxy \
+          --for condition=available --timeout=60s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
