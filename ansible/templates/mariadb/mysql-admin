@@ -6,8 +6,8 @@ set -e
 
 namespace=openstack
 service=mariadb
-secret=mariadb-admin
-field=DBRootPassword
+secret=mariadb-secret
+field=DbRootPassword
 
 password=$(oc get secret --namespace $namespace $secret \
            -o jsonpath="{.data.$field}" | base64 --decode)
