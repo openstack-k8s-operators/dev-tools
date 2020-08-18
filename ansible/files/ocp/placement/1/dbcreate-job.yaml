@@ -18,8 +18,8 @@ spec:
             - name: MYSQL_PWD
               valueFrom:
                 secretKeyRef:
-                  name: mariadb-admin
-                  key: DBRootPassword
+                  name: mariadb-secret
+                  key: DbRootPassword
           command:
             - /bin/bash
             - -c

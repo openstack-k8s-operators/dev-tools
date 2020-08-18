@@ -21,13 +21,9 @@
     with_fileglob:
     - "ocp/mariadb/*"
 
-  - name: Create db root password secret
+  - name: Create mariadb
     shell: |
       set -e
-
-      password=$(oc get -n openstack mariadb/mariadb -o json | jq -r '.spec.rootPassword')
-      oc create secret generic -n openstack mariadb-admin --dry-run -o yaml \
-          --from-literal=DBRootPassword="${password}" > "{{ mariadb_yaml_dir }}/root-pwd.yaml"
 
       oc apply -n openstack -f "{{ mariadb_yaml_dir }}"
     environment:
