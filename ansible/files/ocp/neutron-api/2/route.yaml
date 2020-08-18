@@ -2,6 +2,7 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: neutron-api
+  namespace: openstack
 spec:
   host: neutron.apps.ostest.test.metalkube.org
   path: /

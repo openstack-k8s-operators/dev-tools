@@ -2,6 +2,7 @@ apiVersion: database.openstack.org/v1beta1
 kind: MariaDB
 metadata:
   name: mariadb
+  namespace: openstack
 spec:
   secret: mariadb-secret
   storageClass: host-nfs-storageclass

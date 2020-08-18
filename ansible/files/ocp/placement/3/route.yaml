@@ -2,6 +2,7 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: placement
+  namespace: openstack
 spec:
   host: placement.apps.ostest.test.metalkube.org
   path: /
