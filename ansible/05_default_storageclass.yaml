@@ -22,3 +22,9 @@
       group: host-nfs-storageclass
       storageclass_create: true
       storageclass_isdefault: true
+
+  - name: Schedule fstrim on the host
+    cron:
+      name: fstrim
+      special_time: daily
+      job: "/usr/sbin/fstrim -a"
