@@ -6,11 +6,13 @@
   - oc_local
 
   tasks:
-  - name: Install required package
+  - name: Install required packages
     package:
       state: installed
       name:
       - sqlite
+      - golang
+      - jq
     become: yes
     become_user: root
 
@@ -110,3 +112,12 @@
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Wait for the csv to complete installation
+    shell: |
+      oc get -n openstack "csv/openstack-cluster-operator.v{{csv_version}}" -o json | \
+          jq -r '.status.phase'
+    register: csv_object_fetch
+    until: csv_object_fetch is not failed and csv_object_fetch.stdout == 'Succeeded'
+    retries: 50
+    delay: 5
