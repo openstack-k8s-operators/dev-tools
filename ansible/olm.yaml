@@ -6,11 +6,13 @@
   - oc_local
 
   tasks:
-  - name: Install required package
+  - name: Install required packages
     package:
       state: installed
       name:
       - sqlite
+      - golang
+      - jq
     become: yes
     become_user: root
 
