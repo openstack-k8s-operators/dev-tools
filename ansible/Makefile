@@ -61,20 +61,21 @@ olm_cleanup: hosts local-defaults.yaml
 	-v -i hosts -e @local-defaults.yaml \
 	olm_cleanup.yaml
 
-# XXX: WARNING!!! WARNING!!! DANGER WILL ROBINSON!!!
-# YOU PROBABLY SHOULD NOT EXECUTE ANY OF THE FOLLOWING!
-#
-# Unlike the ansible playbooks, the following all assume you're executing this
-# directly on the host.
+nfs_cleanup: hosts
+	ANSIBLE_FORCE_COLOR=true ansible -i hosts convergence_base \
+	--become -m shell -a \
+	"set -x; \
+	 rm -f /etc/exports.d/host-nfs-storageclass.exports; \
+	 exportfs -ra; \
+	 umount -d /home/nfs/pv-*; \
+	 rm -rf /home/nfs; \
+	 temp=$$(mktemp); \
+	 grep -v "^/home/nfs/data/pv-" /etc/fstab > \$$temp; \
+	 cat \$$temp > /etc/fstab; \
+	 rm \$$temp"
 
-clean: ocp_cleanup host_cleanup nfs_pvc_cleanup
-
-host_cleanup:
-	-echo | sudo tee /etc/exports
-
-nfs_pvc_cleanup:
-        -NFS_DATA_DIR=$$(grep nfs_data_dir ./vars/default.yaml |awk -F":" '{print $$2}') ;\
-        sudo su - root -c "find $$NFS_DATA_DIR -type d -name 'pv-*' -delete"
-
-ocp_cleanup:
-	-sudo su - ocp -c "cd dev-scripts && make clean"
+ocp_cleanup: hosts
+	ANSIBLE_FORCE_COLOR=true ansible -i hosts convergence_base \
+	--become --become-user ocp \
+	-m shell -a "cd /home/ocp/dev-scripts && make clean"
+	$(MAKE) nfs_cleanup
