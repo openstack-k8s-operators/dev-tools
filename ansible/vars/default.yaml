@@ -23,7 +23,7 @@ ocp_ip_stack: v4
 
 # size the OCP VM resources
 ocp_num_masters: 3
-# ocp_num_workers this needs to be > osp_compute_scale
+# ocp_num_workers this needs to be > the number of osp compute workers
 # worker-0 is used to host OSP controller VM, if osp_controller_scale set to 3 then worker-0 ..2 are used.
 ocp_num_workers: 5
 ocp_master_memory: 16384
@@ -82,6 +82,3 @@ local_working_dir: "~/{{ ocp_cluster_name }}-working"
 # nfs export directory
 nfs_data_dir: /home/nfs/data
 nfs_export_dir: /home/nfs
-
-# number of OCP worker nodes should be OSP compute hosts
-osp_compute_scale: 1

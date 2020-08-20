@@ -1,0 +1,40 @@
+apiVersion: compute-node.openstack.org/v1alpha1
+kind: ComputeNodeOpenStack
+metadata:
+  name: worker-osp
+  namespace: openstack
+spec:
+  # Add fields here
+  roleName: worker-osp
+  clusterName: ostest
+  baseWorkerMachineSetName: ostest-worker-0
+  k8sServiceIP: 172.30.0.1
+  apiIntIP: 192.168.111.5
+  workers: 1
+  selinuxDisabled: true
+  compute:
+    novaComputeCPUDedicatedSet: "4-7"
+    novaComputeCPUSharedSet: "0-3"
+    sshdPort: 2022
+    commonConfigMap: common-config
+    ospSecrets: osp-secrets
+  network:
+    nic: "enp6s0"
+    bridgeMappings: ""
+    mechanismDrivers: ""
+    servicePlugins: ""
+    sriov:
+      devName: "test"
+  infraDaemonSets:
+  - name: multus
+    namespace: openshift-multus
+  - name: node-exporter
+    namespace: openshift-monitoring
+  - name: machine-config-daemon
+    namespace: openshift-machine-config-operator
+  drain:
+    drainPodImage: quay.io/openstack-k8s-operators/tripleo-deploy
+    enabled: false
+  openStackClientAdminSecret: openstackclient-admin
+  openStackClientConfigMap: openstackclient
+  serviceAccount: compute-node
