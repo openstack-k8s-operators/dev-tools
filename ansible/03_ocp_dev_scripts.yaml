@@ -91,7 +91,7 @@
   - name: set OCP number of masters
     lineinfile:
       path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export NUM_NUM_MASTERS=.*'
+      regexp: '^export NUM_MASTERS=.*'
       line: "export NUM_MASTERS={{ ocp_num_masters | default('3', true)}}"
 
   - name: set OCP master memory
