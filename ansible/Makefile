@@ -96,3 +96,8 @@ demo: hosts
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
 	demo.yaml
+
+osp_cleanup: hosts local-defaults.yaml
+	ANSIBLE_FORCE_COLOR=true ansible-playbook \
+	-v -i hosts -e @local-defaults.yaml \
+	osp_cleanup.yaml
