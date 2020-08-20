@@ -117,6 +117,9 @@
     shell: |
       oc get -n openstack "csv/openstack-cluster-operator.v{{csv_version}}" -o json | \
           jq -r '.status.phase'
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
     register: csv_object_fetch
     until: csv_object_fetch is not failed and csv_object_fetch.stdout == 'Succeeded'
     retries: 50
