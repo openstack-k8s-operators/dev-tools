@@ -1,0 +1,14 @@
+FROM centos:centos8
+
+ENV brew http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rhosp-openvswitch
+ENV version 2.11
+ENV release 0.6.el8ost
+
+COPY fdp.repo /etc/yum.repos.d/fdp.repo
+RUN dnf -y install \
+    ${brew}/${version}/${release}/noarch/rhosp-openvswitch-${version}-${release}.noarch.rpm \
+    ${brew}/${version}/${release}/noarch/rhosp-openvswitch-ovn-central-${version}-${release}.noarch.rpm
+
+RUN dnf -y clean all
+
+VOLUME ["/var/lib/openvswitch", "/pod-run", "/var/log/openvswitch"]

@@ -17,7 +17,7 @@ spec:
       containers:
       # ovn-northd: convert network objects in nbdb to flows in sbdb
       - name: northd
-        image: "tripleotrain/rhel-binary-ovn-nb-db-server:current-tripleo"
+        image: "quay.io/mbooth/ovn-central:2.11"
         command:
         - /bin/bash
         - -c
