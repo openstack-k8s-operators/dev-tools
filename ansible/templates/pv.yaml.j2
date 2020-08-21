@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: "{{ group }}-{{ name }}"
+  name: "host-nfs-storageclass-{{ name }}"
 spec:
   capacity:
     storage: "{{ size }}Gi"
@@ -11,4 +11,4 @@ spec:
     path: {{ nfs_export_dir}}/{{ name }}
     server: 192.168.111.1
   persistentVolumeReclaimPolicy: Recycle
-  storageClassName: {{ group }}
+  storageClassName: host-nfs-storageclass
