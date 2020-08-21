@@ -5,6 +5,7 @@
 
 ---
 - hosts: localhost
+  gather_facts: false
   vars_files: vars/default.yaml
   roles:
   - oc_local
@@ -45,6 +46,15 @@
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
 
+  - name: add OpenShift CA cert to local disk (so we can access the image registry)
+    shell: >
+      cat $KUBECONFIG | grep certificate-authority-data | \
+        head -n 1 | cut -f 6 -d " " | base64 -d > /etc/ssl/certs/openshift.pem
+    environment:
+      KUBECONFIG: "{{ kubeconfig }}"
+    become_user: root
+    become: true
+
   - name: wait for deployment to be created
     shell: |
       oc get -n openshift-image-registry deployment/image-registry
@@ -63,12 +73,3 @@
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
-
-  - name: add OpenShift CA cert to local disk (so we can access the image registry)
-    shell: >
-      cat $KUBECONFIG | grep certificate-authority-data | \
-        head -n 1 | cut -f 6 -d " " | base64 -d > /etc/ssl/certs/openshift.pem
-    environment:
-      KUBECONFIG: "{{ kubeconfig }}"
-    become_user: root
-    become: true
