@@ -26,10 +26,7 @@
   - name: Start glance
     shell: |
       set -e
-      oc apply -n openstack -f "{{ glance_yaml_dir }}/secret.yaml"
-      oc apply -n openstack -f "{{ glance_yaml_dir }}/glance.yaml"
-      oc apply -n openstack -f "{{ glance_yaml_dir }}/service-init-cmds.yaml"
-      oc apply -n openstack -f "{{ glance_yaml_dir }}/service-init-job.yaml"
+      oc apply -n openstack -f "{{ glance_yaml_dir }}"
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
