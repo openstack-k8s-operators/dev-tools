@@ -1,11 +1,50 @@
 ---
+- hosts: localhost
+  gather_facts: false
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+  tasks:
+
+  - name: Create environment file
+    template:
+      src: oc_env.sh.j2
+      dest: "{{ working_dir }}/oc_env.sh"
+
+  - name: Store local locations for fetch targets
+    set_fact:
+      kubeconfig: "{{ kubeconfig }}"
+      working_bin_dir: "{{ working_bin_dir }}"
+
 - hosts: convergence_base
+  gather_facts: false
   become: true
   become_user: ocp
-
+  vars_files: vars/default.yaml
   tasks:
-  - name: Include variables
-    include_vars: vars/default.yaml
 
-  - name: Configure oc client
-    include_role: name=export_client_to_controller
+  - name: Copy kubeconfig
+    fetch:
+      dest: "{{ hostvars['localhost']['kubeconfig'] }}"
+      src: "{{ base_path }}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
+      flat: true
+
+  - name: Copy oc binary
+    fetch:
+      dest: "{{ hostvars['localhost']['working_bin_dir'] }}/"
+      src: "/usr/local/bin/oc"
+      flat: true
+      mode: 0755
+
+- hosts: localhost
+  gather_facts: false
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+  tasks:
+
+  - name: Fix permissions on oc binary
+    file:
+      path: "{{ working_bin_dir }}/oc"
+      mode: 0755
+      state: file
