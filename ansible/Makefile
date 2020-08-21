@@ -15,11 +15,23 @@ local-defaults.yaml:
 local-deps:
 	ansible-galaxy install -r requirements.yml
 
-ocp_install: hosts local-deps local-defaults.yaml
+ocp_install:
+	$(MAKE) host_prep
+	$(MAKE) dev_scripts
+	$(MAKE) post_install
+
+host_prep: hosts local-deps
+	ANSIBLE_FORCE_COLOR=true ansible-playbook -i hosts \
+	01_prepare_host.yaml \
+	03_ocp_dev_scripts_prep.yaml
+
+dev_scripts: hosts
+	ANSIBLE_FORCE_COLOR=true ansible-playbook -i hosts \
+	03_ocp_dev_scripts.yaml
+
+post_install: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
-	01_prepare_host.yaml \
-	03_ocp_dev_scripts.yaml \
 	04_local_oc_client.yaml \
 	05_default_storageclass.yaml \
 	ocp_image_registry.yaml
