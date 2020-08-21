@@ -33,7 +33,7 @@ spec:
 
       # nbdb: the northbound, or logical network object DB. In raft mode
       - name: nbdb
-        image: "tripleotrain/rhel-binary-ovn-nb-db-server:current-tripleo"
+        image: &image "quay.io/mbooth/ovn-central:2.11"
         command:
         - /bin/bash
         - -c
@@ -119,7 +119,7 @@ spec:
 
       # sbdb: The southbound, or flow DB. In raft mode
       - name: sbdb
-        image: "tripleotrain/rhel-binary-ovn-nb-db-server:current-tripleo"
+        image: *image
         command:
         - /bin/bash
         - -c
@@ -210,7 +210,7 @@ spec:
       # it being apparently disabled, and fails if it can't. We should address
       # this with the ovs team and get rid of it.
       - name: create-log-files
-        image: "tripleotrain/rhel-binary-ovn-nb-db-server:current-tripleo"
+        image: *image
         securityContext:
           runAsUser: 0
         command:
