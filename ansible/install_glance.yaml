@@ -39,13 +39,13 @@
       KUBECONFIG: "{{ kubeconfig }}"
     register: glance_deployment
     until: glance_deployment is not failed
-    retries: 20
+    retries: "{{ (default_timeout / 5)|int }}"
     delay: 5
 
   - name: wait for deployment to become available
     shell: |
       oc wait -n openstack deployment/glanceapi \
-          --for condition=available --timeout=60s
+          --for condition=available --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"

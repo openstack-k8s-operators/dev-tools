@@ -32,9 +32,9 @@
 
       oc apply -f "{{ nova_yaml_dir }}/1/"
       oc wait -n openstack job/nova-api-dbcreate-api \
-          --for condition=Complete --timeout=60s
+          --for condition=Complete --timeout={{ default_timeout }}s
       oc wait -n openstack job/nova-api-dbcreate-cell0 \
-          --for condition=Complete --timeout=60s
+          --for condition=Complete --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
@@ -45,9 +45,9 @@
 
       oc apply -f "{{ nova_yaml_dir }}/2/"
       oc wait -n openstack job/nova-api-dbsync \
-          --for condition=Complete --timeout=60s
+          --for condition=Complete --timeout={{ default_timeout }}s
       oc wait -n openstack job/nova-api-service-init \
-          --for condition=Complete --timeout=60s
+          --for condition=Complete --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
@@ -58,7 +58,7 @@
 
       oc apply -f "{{ nova_yaml_dir }}/3/"
       oc wait -n openstack job/nova-api-map-cell0 \
-          --for condition=Complete --timeout=60s
+          --for condition=Complete --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
@@ -69,11 +69,11 @@
 
       oc apply -f "{{ nova_yaml_dir }}/4/"
       oc wait -n openstack deployment/nova-api \
-          --for condition=available --timeout=60s
+          --for condition=available --timeout={{ default_timeout }}s
       oc wait -n openstack deployment/nova-api-scheduler \
-          --for condition=available --timeout=60s
+          --for condition=available --timeout={{ default_timeout }}s
       oc wait -n openstack deployment/nova-api-super-conductor \
-          --for condition=available --timeout=60s
+          --for condition=available --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"

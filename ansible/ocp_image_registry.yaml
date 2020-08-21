@@ -63,13 +63,14 @@
       KUBECONFIG: "{{ kubeconfig }}"
     register: image_registry_deployment
     until: image_registry_deployment is not failed
-    retries: 20
+    retries: "{{ (default_timeout / 5)|int }}"
     delay: 5
 
   - name: wait for image registry to be deployed
     shell: |
       set -e
-      oc wait --for condition=available -n openshift-image-registry deployment/image-registry --timeout=120s
+      oc wait --for condition=available -n openshift-image-registry \
+          deployment/image-registry --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"

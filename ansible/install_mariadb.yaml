@@ -47,12 +47,12 @@
       KUBECONFIG: "{{ kubeconfig }}"
     register: mariadb_pod_creation
     until: mariadb_pod_creation is not failed
-    retries: 20
+    retries: "{{ (default_timeout / 5)|int }}"
     delay: 5
 
   - name: Wait for deployment
     shell: |
-      oc wait -n openstack pod/mariadb --for condition=ready --timeout=60s
+      oc wait -n openstack pod/mariadb --for condition=ready --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"

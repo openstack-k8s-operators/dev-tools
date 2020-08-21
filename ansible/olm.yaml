@@ -122,5 +122,5 @@
       KUBECONFIG: "{{ kubeconfig }}"
     register: csv_object_fetch
     until: csv_object_fetch is not failed and csv_object_fetch.stdout == 'Succeeded'
-    retries: 50
+    retries: "{{ (default_timeout / 5)|int }}"
     delay: 5

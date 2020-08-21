@@ -45,12 +45,13 @@
       KUBECONFIG: "{{ kubeconfig }}"
     register: keystone_deployment_creation
     until: keystone_deployment_creation is not failed
-    retries: 20
+    retries: "{{ (default_timeout / 5)|int }}"
     delay: 5
 
   - name: Wait for deployment
     shell: |
-      oc wait -n openstack deployment/keystone --for condition=Available --timeout 120s
+      oc wait -n openstack deployment/keystone --for condition=Available \
+          --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"

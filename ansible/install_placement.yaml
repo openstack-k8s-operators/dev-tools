@@ -31,7 +31,7 @@
 
       oc apply -f "{{ placement_yaml_dir }}/1/"
       oc wait -n openstack job/placement-dbcreate \
-          --for condition=Complete --timeout=60s
+          --for condition=Complete --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
@@ -42,9 +42,9 @@
 
       oc apply -f "{{ placement_yaml_dir }}/2/"
       oc wait -n openstack job/placement-dbsync \
-          --for condition=Complete --timeout=60s
+          --for condition=Complete --timeout={{ default_timeout }}s
       oc wait -n openstack job/placement-service-init \
-          --for condition=Complete --timeout=60s
+          --for condition=Complete --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
@@ -55,7 +55,7 @@
 
       oc apply -f "{{ placement_yaml_dir }}/3/"
       oc wait -n openstack deployment/placement \
-          --for condition=available --timeout=60s
+          --for condition=available --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"

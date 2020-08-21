@@ -39,7 +39,7 @@
       oc apply -f "{{ rabbitmq_yaml_dir }}"
 
       oc wait -n openstack pod/rabbitmq-0 \
-          --for condition=Ready --timeout=120s
+          --for condition=Ready --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
@@ -49,10 +49,10 @@
       oc apply -f "{{ config_yaml_dir }}"
 
       oc wait -n openstack job/rabbitmq-create-api \
-          --for condition=Complete --timeout=120s
+          --for condition=Complete --timeout={{ default_timeout }}s
 
       oc wait -n openstack job/rabbitmq-create-cell \
-          --for condition=Complete --timeout=120s
+          --for condition=Complete --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"

@@ -82,3 +82,5 @@ local_working_dir: "~/{{ ocp_cluster_name }}-working"
 # nfs export directory
 nfs_data_dir: /home/nfs/data
 nfs_export_dir: /home/nfs
+
+default_timeout: 180

@@ -31,7 +31,7 @@
       # available. For us, it's sufficient that at least 1 node is available.
       # ovn-ovsdb-0 will always be brought up first.
       oc wait -n openstack pod/ovn-ovsdb-0 \
-          --for condition=Ready --timeout=120s
+          --for condition=Ready --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
