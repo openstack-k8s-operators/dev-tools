@@ -38,7 +38,11 @@ spec:
         - /bin/bash
         - -c
         - |
-          set -xe
+          set -xe -o pipefail
+
+          # See the comment on the override-local-service-ip to see what this
+          # is about
+          node_svc_name="$(hostname).openstack.svc.cluster.local"
 
           # The StatefulSet ensures that the first node to come up will be node
           # zero. Below we configure node zero to initialise a new cluster
@@ -58,7 +62,7 @@ spec:
             exec /usr/share/openvswitch/scripts/ovn-ctl \
             --no-monitor \
             --db-nb-create-insecure-remote=yes \
-            --db-nb-cluster-local-addr="$(hostname -f)" \
+            --db-nb-cluster-local-addr="${node_svc_name}" \
             --db-nb-cluster-local-proto=tcp \
             --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
             run_nb_ovsdb
@@ -66,9 +70,9 @@ spec:
             exec /usr/share/openvswitch/scripts/ovn-ctl \
             --no-monitor \
             --db-nb-create-insecure-remote=yes \
-            --db-nb-cluster-remote-addr="${initialiser}.ovn-ovsdb.openstack.svc.cluster.local" \
+            --db-nb-cluster-remote-addr="${initialiser}.openstack.svc.cluster.local" \
             --db-nb-cluster-remote-proto=tcp \
-            --db-nb-cluster-local-addr="$(hostname -f)" \
+            --db-nb-cluster-local-addr="${node_svc_name}" \
             --db-nb-cluster-local-proto=tcp \
             --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
             run_nb_ovsdb
@@ -92,20 +96,23 @@ spec:
               set -xe
               ovsdb-client dump tcp:$(hostname).ovn-ovsdb.openstack.svc.cluster.local:6641 \
                                 OVN_Northbound NB_Global _uuid
-        env:
+        env: &pod_env
         - name: OVS_RUNDIR
           value: /pod-run
         - name: OVS_DBDIR
           value: /var/lib/openvswitch
         - name: OVN_LOG_LEVEL
           value: info
-        volumeMounts:
+        volumeMounts: &pod_mounts
         - mountPath: /var/lib/openvswitch/
           name: data
         - mountPath: /pod-run
           name: pod-run
         - mountPath: /var/log/openvswitch/
           name: logs
+        - mountPath: /etc/hosts
+          name: hosts
+          subPath: hosts
         resources:
           requests:
             cpu: 10m
@@ -124,7 +131,11 @@ spec:
         - /bin/bash
         - -c
         - |
-          set -xe
+          set -xe -o pipefail
+
+          # See the comment on the override-local-service-ip to see what this
+          # is about
+          node_svc_name="$(hostname).openstack.svc.cluster.local"
 
           # The StatefulSet ensures that the first node to come up will be node
           # zero. Below we configure node zero to initialise a new cluster
@@ -144,7 +155,7 @@ spec:
             exec /usr/share/openvswitch/scripts/ovn-ctl \
             --no-monitor \
             --db-sb-create-insecure-remote=yes \
-            --db-sb-cluster-local-addr="$(hostname -f)" \
+            --db-sb-cluster-local-addr="${node_svc_name}" \
             --db-sb-cluster-local-proto=tcp \
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
             run_sb_ovsdb
@@ -152,9 +163,9 @@ spec:
             exec /usr/share/openvswitch/scripts/ovn-ctl \
             --no-monitor \
             --db-sb-create-insecure-remote=yes \
-            --db-sb-cluster-remote-addr="${initialiser}.ovn-ovsdb.openstack.svc.cluster.local" \
+            --db-sb-cluster-remote-addr="${initialiser}.openstack.svc.cluster.local" \
             --db-sb-cluster-remote-proto=tcp \
-            --db-sb-cluster-local-addr="$(hostname -f)" \
+            --db-sb-cluster-local-addr="${node_svc_name}" \
             --db-sb-cluster-local-proto=tcp \
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
             run_sb_ovsdb
@@ -178,20 +189,8 @@ spec:
               set -xe
               ovsdb-client dump tcp:$(hostname).ovn-ovsdb.openstack.svc.cluster.local:6642 \
                                 OVN_Southbound SB_Global _uuid
-        env:
-        - name: OVS_RUNDIR
-          value: /pod-run
-        - name: OVS_DBDIR
-          value: /var/lib/openvswitch
-        - name: OVN_LOG_LEVEL
-          value: info
-        volumeMounts:
-        - mountPath: /var/lib/openvswitch/
-          name: data
-        - mountPath: /pod-run
-          name: pod-run
-        - mountPath: /var/log/openvswitch/
-          name: logs
+        env: *pod_env
+        volumeMounts: *pod_mounts
         ports:
         - name: sb-db-port
           containerPort: 6642
@@ -223,10 +222,59 @@ spec:
         - mountPath: /var/log/openvswitch/
           name: logs
 
+
+      # ovsdb adds 'cluster-local-addr' to the shared cluster table, and also
+      # binds to it locally. Therefore it must be possible for the local pod to
+      # bind to this name, and for other pods to route to it.
+      #
+      # Ideally we would use the pod's IP address from the statefulset service,
+      # i.e.:
+      #   ovn-ovsdb-0.ovn-ovsdb.openstack.svc.cluster.local
+      # however, there are 2 problems which combine to mean we can't do this:
+      # * This name is only available from DNS while the pod is running
+      # * ovs-dbserver treats DNS names which don't currently resolve as a
+      #   syntax error and fails to start.
+      # So while a running pod will re-resolve a name which disappears and
+      # comes back with a different IP, it won't start at all unless all other
+      # pods are running (or all lower ordered pods during initial startup).
+      # This means that it's not possible to recover from a situation where 2
+      # pods go down.
+      #
+      # We also create an independent service for each node in the cluster.
+      # These services always resolve in DNS whether the pod is up or not, but
+      # they're not local addresses, so we can't bind to them.
+      #
+      # Enter this hack: we add the service name for the local node to
+      # /etc/hosts. This means that the local node can bind to it, because it's
+      # a local IP address, and other nodes can always resolve the name and
+      # connect to it when it's up.
+      - name: override-local-service-ip
+        image: *image
+        securityContext:
+          runAsUser: 0
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -e -o pipefail
+
+            cp /etc/hosts /hosts-new
+            echo "$POD_IP $(hostname).openstack.svc.cluster.local" >> /hosts-new/hosts
+        volumeMounts:
+        - mountPath: /hosts-new
+          name: hosts
+
       volumes:
       - name: pod-run
         emptyDir: {}
       - name: logs
+        emptyDir: {}
+      - name: hosts
         emptyDir: {}
   volumeClaimTemplates:
   - metadata:
