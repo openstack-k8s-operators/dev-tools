@@ -129,3 +129,7 @@ data:
     auth_url = http://keystone.openstack.svc:5000/
     username = placement
     password = foobar123
+
+    [scheduler]
+    # run periodic task to discover hosts automatically
+    discover_hosts_in_cells_interval = 60
