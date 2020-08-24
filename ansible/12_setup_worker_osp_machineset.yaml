@@ -54,6 +54,10 @@
       <<: *oc_env
     loop: "{{ baremetalhosts }}"
 
+  # XXX(mdbooth): This will fail if workers is set to zero, because this
+  # results in the value being removed. I explicitly set 'jq -e' to error in
+  # this case, so we could just remove it, but I added it because we were
+  # missing real errorsit in other places. For now, just don't set it to zero, I guess?
   - name: Get the target number of osp workers
     shell: |
       set -e -o pipefail
