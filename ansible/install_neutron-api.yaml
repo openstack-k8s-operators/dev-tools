@@ -25,6 +25,36 @@
     - "ocp/neutron-api/2"
     - "ocp/neutron-api/3"
 
+  - name: get NBConnection
+    shell: |
+      set -e -o pipefail
+
+      oc get cm -n openstack ovn-connection -o json | jq '.data.NBConnection' -r -e
+    register: nbconnection
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: get SBConnection
+    shell: |
+      set -e -o pipefail
+
+      oc get cm -n openstack ovn-connection -o json | jq '.data.SBConnection' -r -e
+    register: sbconnection
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: set ovn_nb_connection fact
+    set_fact:
+      ovn_nb_connection: "{{ nbconnection.stdout }}"
+      ovn_sb_connection: "{{ sbconnection.stdout }}"
+
+  - name: create neutron-api configmap.yaml from template
+    template:
+      src:  "neutron-api/configmap.yaml.j2"
+      dest: "{{ neutron_yaml_dir }}/2/configmap.yaml"
+
   - name: Create database
     shell: |
       set -e
