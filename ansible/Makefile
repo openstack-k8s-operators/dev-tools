@@ -91,3 +91,8 @@ ocp_cleanup: hosts
 	--become --become-user ocp \
 	-m shell -a "cd /home/ocp/dev-scripts && make clean"
 	$(MAKE) nfs_cleanup
+
+demo: hosts
+	ANSIBLE_FORCE_COLOR=true ansible-playbook \
+	-i hosts -e @local-defaults.yaml \
+	demo.yaml
