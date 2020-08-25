@@ -107,6 +107,7 @@ data:
 
     [api]
     auth_strategy = keystone
+    local_metadata_per_cell = true
 
     [keystone_authtoken]
     www_authenticate_uri = http://keystone.apps.ostest.test.metalkube.org/
