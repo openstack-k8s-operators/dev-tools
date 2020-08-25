@@ -32,6 +32,30 @@
       # ovn-ovsdb-0 will always be brought up first.
       oc wait -n openstack pod/ovn-ovsdb-0 \
           --for condition=Ready --timeout={{ default_timeout }}s
-    environment:
+    environment: &oc_env
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Get service IP addresses
+    shell: |
+      set -e -o pipefail
+
+      oc get svc -l app=ovn-ovsdb -o json | jq -re '.items[].spec.clusterIP'
+    register: ovn_ovsdb_ips
+    environment:
+      <<: *oc_env
+
+  - name: Construct connection strings for nb and sb databases
+    set_fact:
+      ovn_nb_connection: "{{ ovn_nb_connection }}{{ (ovn_nb_connection|length > 0) | ternary(',', '', omit) }}tcp:{{ item }}:6641"
+      ovn_sb_connection: "{{ ovn_sb_connection }}{{ (ovn_sb_connection|length > 0) | ternary(',', '', omit) }}tcp:{{ item }}:6642"
+    loop: "{{ ovn_ovsdb_ips.stdout_lines }}"
+    vars:
+      ovn_nb_connection: ""
+      ovn_sb_connection: ""
+
+  - name: Create config map
+    shell: |
+      oc create configmap ovn-connection --dry-run=client -o json \
+          --from-literal=NBConnection={{ ovn_nb_connection }} \
+          --from-literal=SBConnection={{ ovn_sb_connection }} | oc apply -f -
