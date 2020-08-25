@@ -40,7 +40,7 @@
     shell: |
       set -e -o pipefail
 
-      oc get svc -l app=ovn-ovsdb -o json | jq -re '.items[].spec.clusterIP'
+      oc get -n openstack svc -l app=ovn-ovsdb -o json | jq -re '.items[].spec.clusterIP'
     register: ovn_ovsdb_ips
     environment:
       <<: *oc_env
