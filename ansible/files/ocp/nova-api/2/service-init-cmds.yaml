@@ -9,6 +9,6 @@ data:
     project create service
     role add --project service --user nova_api admin
     service create --name nova --description "Openstack Compute" compute
-    endpoint create --region regionOne nova public http://nova.apps.ostest.test.metalkube.org/
-    endpoint create --region regionOne nova admin http://nova.apps.ostest.test.metalkube.org/
-    endpoint create --region regionOne nova internal http://nova-api.openstack.svc:8774/
+    endpoint create --region regionOne nova public http://nova.apps.ostest.test.metalkube.org/v2.1/
+    endpoint create --region regionOne nova admin http://nova.apps.ostest.test.metalkube.org/v2.1/
+    endpoint create --region regionOne nova internal http://nova-api.openstack.svc:8774/v2.1/
