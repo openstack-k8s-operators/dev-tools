@@ -12,14 +12,21 @@
         PATH: "{{ oc_env_path }}"
         KUBECONFIG: "{{ kubeconfig }}"
       block:
-        - name: switch to openstack project/namespace
+
+        - name: scale osp machineset to 0
+          shell: |
+            if oc get -n openshift-machine-api machineset ostest-worker-osp-0; then
+              os scale --replicas 0 machineset ostest-worker-osp-0 --timeout 3m
+            fi
+
+        - name: delete osp machineset
           shell: >
-            oc project openstack
+            oc delete --ignore-not-found -n openshift-machine-api machineset ostest-worker-osp-0
 
         - name: delete openstack.org CRD's
           shell: >
-            oc get crds | grep openstack.org | cut -f1 -d ' ' | xargs -t oc delete crds --cascade
+            oc get crds | grep openstack.org | cut -f1 -d ' ' | xargs -r -t oc delete crds --cascade
 
         - name: delete openstack namespace
           shell: >
-            oc delete namespace openstack
+              oc delete --ignore-not-found namespace openstack
