@@ -88,8 +88,8 @@ data:
     enable_security_group = true
     
     [ovn]
-    ovn_nb_connection = tcp:172.30.206.201:6641,tcp:172.30.105.9:6641,tcp:172.30.115.54:6641
-    ovn_sb_connection = tcp:172.30.206.201:6642,tcp:172.30.105.9:6642,tcp:172.30.115.54:6642
+    ovn_nb_connection = {{ ovn_nb_connection }}
+    ovn_sb_connection = {{ ovn_sb_connection }}
     #ovn_nb_connection = tcp:ovn-ovsdb-0.openstack.svc:6641,tcp:ovn-ovsdb-1.openstack.svc:6641,tcp:ovn-ovsdb-2.openstack.svc:6641
     #ovn_sb_connection = tcp:ovn-ovsdb-0.openstack.svc:6642,tcp:ovn-ovsdb-1.openstack.svc:6642,tcp:ovn-ovsdb-2.openstack.svc:6642
     ovn_l3_scheduler = leastloaded
