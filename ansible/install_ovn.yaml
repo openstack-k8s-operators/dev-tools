@@ -56,7 +56,8 @@
 
   - name: Create config map
     shell: |
-      oc create configmap ovn-connection --dry-run=client -o json \
+      oc create configmap -n openstack ovn-connection \
+          --dry-run=client --save-config=true -o json \
           --from-literal=NBConnection={{ ovn_nb_connection }} \
           --from-literal=SBConnection={{ ovn_sb_connection }} | oc apply -f -
     environment:
