@@ -83,7 +83,7 @@
     shell: |
       set -e -o pipefail
 
-      oc get machineset/{{ ocp_cluster_name }}-worker-osp -o json | jq -re '.status.readyReplicas'
+      oc get -n openshift-machine-api machineset/{{ ocp_cluster_name }}-worker-osp -o json | jq -re '.status.readyReplicas'
     environment:
       <<: *oc_env
     register: worker_osp_ready
