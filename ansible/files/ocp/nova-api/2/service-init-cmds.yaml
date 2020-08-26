@@ -5,9 +5,9 @@ metadata:
   namespace: openstack
 data:
   openstackclient.cmds: |
-    user create --domain default --password foobar123 nova_api
+    user create --domain default --password foobar123 nova
     project create service
-    role add --project service --user nova_api admin
+    role add --project service --user nova admin
     service create --name nova --description "Openstack Compute" compute
     endpoint create --region regionOne nova public http://nova.apps.ostest.test.metalkube.org/v2.1/
     endpoint create --region regionOne nova admin http://nova.apps.ostest.test.metalkube.org/v2.1/
