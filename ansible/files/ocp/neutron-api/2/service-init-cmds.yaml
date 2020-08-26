@@ -11,4 +11,4 @@ data:
     service create --name neutron --description "Openstack Networking" network
     endpoint create --region regionOne neutron public http://neutron.apps.ostest.test.metalkube.org/
     endpoint create --region regionOne neutron admin http://neutron.apps.ostest.test.metalkube.org/
-    endpoint create --region regionOne neutron internal http://neutron.openstack.svc:9696/
+    endpoint create --region regionOne neutron internal http://neutron-api.openstack.svc:9696/
