@@ -101,6 +101,12 @@ ocp_cleanup: hosts
 demo: hosts
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
+	install_namespace.yaml
+	ANSIBLE_FORCE_COLOR=true ansible-playbook \
+	-i hosts -e @local-defaults.yaml \
+	olm.yaml --tags catalogsource
+	ANSIBLE_FORCE_COLOR=true ansible-playbook \
+	-i hosts -e @local-defaults.yaml \
 	demo.yaml
 
 osp_cleanup: hosts local-defaults.yaml
