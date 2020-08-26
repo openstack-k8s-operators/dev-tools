@@ -20,13 +20,13 @@ ocp_install:
 	$(MAKE) dev_scripts
 	$(MAKE) post_install
 
-host_prep: hosts local-deps
-	ANSIBLE_FORCE_COLOR=true ansible-playbook -i hosts \
+host_prep: hosts local-deps local-defaults.yaml
+	ANSIBLE_FORCE_COLOR=true ansible-playbook -i hosts -e @local-defaults.yaml \
 	01_prepare_host.yaml \
 	03_ocp_dev_scripts_prep.yaml
 
-dev_scripts: hosts
-	ANSIBLE_FORCE_COLOR=true ansible-playbook -i hosts \
+dev_scripts: hosts local-defaults.yaml
+	ANSIBLE_FORCE_COLOR=true ansible-playbook -i hosts -e @local-defaults.yaml \
 	03_ocp_dev_scripts.yaml
 
 post_install: hosts local-defaults.yaml
@@ -36,7 +36,8 @@ post_install: hosts local-defaults.yaml
 	05_default_storageclass.yaml \
 	ocp_image_registry.yaml
 
-osp_operators_install: hosts local-defaults.yaml
+osp_operators_install: compute_node
+compute_node: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
 	12_setup_worker_osp_machineset.yaml \
