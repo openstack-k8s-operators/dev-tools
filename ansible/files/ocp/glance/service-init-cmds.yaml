@@ -9,6 +9,6 @@ data:
     project create service
     role add --project service --user glance admin
     service create --name glance --description "Openstack Image" image
-    endpoint create --region regionOne image public http://glance.apps.ostest.test.metalkube.org/
-    endpoint create --region regionOne image admin http://glance.apps.ostest.test.metalkube.org/
-    endpoint create --region regionOne image internal http://glance.openstack.svc:9292/
+    endpoint create --region regionOne image public http://glanceapi-openstack.apps.ostest.test.metalkube.org/
+    endpoint create --region regionOne image admin http://glanceapi-openstack.apps.ostest.test.metalkube.org/
+    endpoint create --region regionOne image internal http://glanceapi.openstack.svc:9292/
