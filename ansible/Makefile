@@ -40,6 +40,7 @@ osp_operators_install: compute_node
 compute_node: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
+        09_create_common-config.yaml \
 	12_setup_worker_osp_machineset.yaml \
 
 osp_tests_run: hosts local-defaults.yaml
