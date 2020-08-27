@@ -6,6 +6,16 @@
   - oc_local
   tasks:
 
+  - name: Install pip
+    yum:
+      name:
+      - python3-pip
+    become: yes
+
+  - name: Install openstack client
+    shell: |
+      pip install --user python-openstackclient osc-placement
+
   - name: Create environment file
     template:
       src: oc_env.sh.j2
