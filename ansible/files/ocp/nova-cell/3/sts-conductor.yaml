@@ -1,10 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: &name nova-cell1-conductor
   namespace: &namespace openstack
 spec:
   replicas: 1
+  podManagementPolicy: Parallel
   selector:
     matchLabels:
       app: *name
