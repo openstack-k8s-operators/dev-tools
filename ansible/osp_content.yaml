@@ -1,0 +1,36 @@
+---
+- hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+
+  tasks:
+  - name: create OCP content
+    shell: |
+      set -e -o pipefail
+
+      if ! [[ $(openstack network list | grep private) ]]; then
+        openstack network create private
+        openstack subnet create subnet1 --network private --subnet-range 192.168.0.0/24
+      fi
+      if ! [[ $(openstack flavor list | grep m1.small) ]]; then
+        openstack flavor create --ram 512 --vcpus 1 --disk 1 --ephemeral 1 m1.small
+      fi
+      if ! [[ $(openstack image list | grep cirros) ]]; then
+        curl -L -o {{ working_dir }}/cirros-0.3.5-x86_64-disk.img https://github.com/cirros-dev/cirros/releases/download/0.3.5/cirros-0.3.5-x86_64-disk.img
+        openstack image create --container-format bare --disk-format qcow2 --file {{ working_dir }}/cirros-0.3.5-x86_64-disk.img cirros
+      fi
+      if ! [[ $(openstack security group rule list default | egrep "icmp|22") ]]; then
+        openstack security group rule create --protocol icmp --ingress --icmp-type -1 default
+        openstack security group rule create --protocol tcp --ingress --dst-port 22 default
+      fi
+    environment: &oc_env
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Create test instance
+    shell: |
+      set -e -o pipefail
+      openstack server create --flavor m1.small --image cirros --nic net-id=$(openstack network list --name private -f value -c ID) test
+    environment:
+      <<: *oc_env
