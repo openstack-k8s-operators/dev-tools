@@ -61,3 +61,23 @@
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: Wait for cell create job to finish
+    shell: |
+      set -e
+
+      oc wait -n openstack jobs/nova-cell1-create-cell --for condition=complete \
+          --timeout={{ default_timeout }}s
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  # https://docs.openstack.org/nova/latest/user/cells.html#faqs point 7
+  - name: Restart nova-scheduler to refresh cell mappings cache
+    shell: |
+      set -e
+
+      oc delete pods -n openstack -l app=nova-api-scheduler
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
