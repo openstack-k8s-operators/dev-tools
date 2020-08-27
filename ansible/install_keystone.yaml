@@ -28,7 +28,7 @@
   - name: create keystone CR and osconfig
     shell: |
       oc apply -n openstack -f "{{ keystone_yaml_dir }}"
-    environment:
+    environment: &oc_env
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
 
@@ -55,3 +55,17 @@
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
+
+  # This workaround can be removed when
+  # https://issues.redhat.com/browse/OSPK8-248 is resolved.
+  - name: Wait for keystone bootstrap
+    shell: |
+      set -e -o pipefail
+
+      oc get -n openstack keystoneapi/keystone -o json | jq -re '.status.bootstrapHash'
+    environment:
+      <<: *oc_env
+    register: keystone_bootstrap
+    until: keystone_bootstrap is not failed and keystone_bootstrap.stdout != ""
+    retries: "{{ (default_timeout / 5)|int }}"
+    delay: 5
