@@ -134,3 +134,13 @@ data:
     [scheduler]
     # run periodic task to discover hosts automatically
     discover_hosts_in_cells_interval = 60
+
+    [neutron]
+    region_name = regionOne
+    project_domain_name = Default
+    project_name = service
+    auth_type = password
+    user_domain_name = Default
+    auth_url = http://keystone.openstack.svc:5000/
+    username = neutron
+    password = foobar123
