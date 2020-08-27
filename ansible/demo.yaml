@@ -33,7 +33,6 @@
       path: "{{ working_dir }}/demo/htpasswd"
 
   - name: create secret for htpasswd file
-    become_user: ocp
     shell: |
       if oc get secret htpass-secret -n openshift-config; then
         oc delete secret htpass-secret -n openshift-config
@@ -44,7 +43,6 @@
       KUBECONFIG: "{{ kubeconfig }}"
 
   - name: create htpasswd identity provider
-    become_user: ocp
     shell: >
       oc apply -f {{ working_dir }}/demo/htpasswd-identity-provider.yaml
     environment:
@@ -52,11 +50,31 @@
       KUBECONFIG: "{{ kubeconfig }}"
 
   - name: create clusterrolebinding for cluster-admin to demo user
-    become_user: ocp
     shell: |
       if ! oc get clusterrolebinding demo-crb; then
         oc create clusterrolebinding demo-crb --clusterrole cluster-admin --user demo
       fi
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: delete OLM subscription
+    shell: |
+      oc delete --ignore-not-found -n openstack subscription openstack-cluster
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: delete OLM operator group
+    shell: |
+      oc delete --ignore-not-found -n openstack operatorgroup openstack-cluster-operator.v{{ csv_version }}
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: delete OLM csv
+    shell: |
+      oc delete --ignore-not-found -n openstack csv openstack-cluster-operator.v{{ csv_version }}
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"
