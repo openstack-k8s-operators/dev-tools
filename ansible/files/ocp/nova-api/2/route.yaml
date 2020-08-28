@@ -1,8 +1,10 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: nova-api
+  name: &name nova-api
   namespace: openstack
+  labels:
+    app: *name
 spec:
   host: nova.apps.ostest.test.metalkube.org
   path: /

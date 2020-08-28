@@ -3,6 +3,8 @@ kind: Route
 metadata:
   name: &name nova-cell1-novncproxy
   namespace: openstack
+  labels:
+    app: *name
 spec:
   host: nova-cell1-novncproxy.apps.ostest.test.metalkube.org
   path: /

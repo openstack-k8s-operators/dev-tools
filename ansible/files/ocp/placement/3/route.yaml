@@ -1,13 +1,15 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: placement
+  name: &name placement
   namespace: openstack
+  labels:
+    app: *name
 spec:
   host: placement.apps.ostest.test.metalkube.org
   path: /
   to:
     kind: Service
-    name: placement
+    name: *name
   port:
     targetPort: api
