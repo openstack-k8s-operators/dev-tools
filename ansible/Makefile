@@ -53,21 +53,28 @@ osp_tests_run: hosts local-defaults.yaml
 	-i hosts -e @local-defaults.yaml \
   20_tempest_ocp.yaml \
 
-podified-ctlplane: hosts ctlplane
-ctlplane: local-defaults.yaml
+ctlplane-operator: hosts local-defaults.yaml
 	# NOTE: requires 'make olm'
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
 	install_namespace.yaml \
-	install_mariadb.yaml \
+	install_ctlplane.yaml \
+
+ctlplane-yamls: hosts local-defaults.yaml
+	# NOTE: requires 'make olm'
+	ANSIBLE_FORCE_COLOR=true ansible-playbook \
+	-i hosts -e @local-defaults.yaml \
 	install_rabbitmq.yaml \
-	install_keystone.yaml \
-	install_glance.yaml \
+	install_osconfig.yaml \
+	install_glance_service_init.yaml \
 	install_placement.yaml \
 	install_ovn.yaml \
 	install_neutron-api.yaml \
 	install_nova-api.yaml \
 	install_nova-cell.yaml
+
+podified-ctlplane: ctlplane
+ctlplane: hosts local-defaults.yaml ctlplane-operator ctlplane-yamls
 
 olm: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
