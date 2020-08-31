@@ -70,10 +70,10 @@
       oc apply -f "{{ nova_yaml_dir }}/4/"
       oc wait -n openstack deployment/nova-api \
           --for condition=available --timeout={{ default_timeout }}s
-      oc wait -n openstack deployment/nova-api-scheduler \
-          --for condition=available --timeout={{ default_timeout }}s
-      oc wait -n openstack deployment/nova-api-super-conductor \
-          --for condition=available --timeout={{ default_timeout }}s
+      oc wait -n openstack pod -l statefulset.kubernetes.io/pod-name=nova-api-scheduler-0 \
+          --for=condition=ready --timeout={{ default_timeout }}s
+      oc wait -n openstack pod -l statefulset.kubernetes.io/pod-name=nova-api-super-conductor-0 \
+          --for=condition=ready --timeout={{ default_timeout }}s
     environment:
       PATH: "{{ oc_env_path }}"
       KUBECONFIG: "{{ kubeconfig }}"

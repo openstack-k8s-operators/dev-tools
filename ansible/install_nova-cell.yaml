@@ -52,8 +52,8 @@
       set -e
 
       oc apply -f "{{ nova_yaml_dir }}/3/"
-      oc wait -n openstack deployment/nova-cell1-conductor \
-          --for condition=available --timeout={{ default_timeout }}s
+      oc wait -n openstack pod -l statefulset.kubernetes.io/pod-name=nova-cell1-conductor-0 \
+          --for=condition=ready --timeout={{ default_timeout }}s
       oc wait -n openstack deployment/nova-cell1-metadata \
           --for condition=available --timeout={{ default_timeout }}s
       oc wait -n openstack deployment/nova-cell1-novncproxy \
