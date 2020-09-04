@@ -4,7 +4,7 @@ base_path: /home/ocp
 #dev_scripts_branch: defaults to "HEAD"
 
 # To set a specific release to install.
-ocp_release_image: quay.io/openshift-release-dev/ocp-release:4.5.4-x86_64
+ocp_release_image: quay.io/openshift-release-dev/ocp-release:4.5.8-x86_64
 
 # private repo to read required secret files from
 # The playbooks expect secret files which can be placed in a private repo
