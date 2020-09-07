@@ -53,9 +53,9 @@ opm_version: v1.12.5
 #openstack_k8s_operators_heat_branch: defaults to "HEAD"
 
 # operator images and tag to use
-nova_operator_image: quay.io/openstack-k8s-operators/nova-operator:v0.0.4
+nova_operator_image: quay.io/openstack-k8s-operators/nova-operator:v0.0.5
 neutron_operator_image: quay.io/openstack-k8s-operators/neutron-operator:v0.0.4
-compute_node_operator_image: quay.io/openstack-k8s-operators/compute-node-operator:v0.0.4
+compute_node_operator_image: quay.io/openstack-k8s-operators/compute-node-operator:v0.0.5
 cluster_operator_image: quay.io/openstack-k8s-operators/openstack-cluster-operator:v0.0.4
 keystone_operator_image: quay.io/openstack-k8s-operators/keystone-operator:v0.0.4
 mariadb_operator_image: quay.io/openstack-k8s-operators/mariadb-operator:v0.0.2
