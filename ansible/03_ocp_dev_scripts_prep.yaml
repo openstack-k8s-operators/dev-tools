@@ -7,30 +7,11 @@
   - name: Include variables
     include_vars: vars/default.yaml
 
-  - name: Clone the dev-scripts repo
+  - name: Clone {{ (use_kni_ipi_virt) | ternary('kni-ipi-virt','dev-scripts') }} repo
     git:
       repo: "{{ dev_scripts_repo | default('https://github.com/openshift-metal3/dev-scripts.git', true) }}"
       dest: "{{ base_path }}/dev-scripts"
       version: "{{ dev_scripts_branch | default('HEAD', true) }}"
-
-  - name: Copy the config_example.sh to config_$USER.sh
-    copy:
-      src: "{{ base_path }}/dev-scripts/config_example.sh"
-      dest: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      mode: 0755
-      remote_src: yes
-
-  - name: set OCP release to use
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export OPENSHIFT_RELEASE_IMAGE=.*'
-      line: "export OPENSHIFT_RELEASE_IMAGE={{ ocp_release_image }}"
-
-  - name: set WORKING_DIR in {{ base_path }}/dev-scripts/config_$USER.sh
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export WORKING_DIR='
-      line: export WORKING_DIR='{{ base_path }}'
 
   - name: Copy pull-secret file 
     when: secrets_repo is undefined
@@ -64,74 +45,208 @@
         dest: "{{ secrets_repo_path }}"
         version: "{{ secrets_branch | default('HEAD', true) }}"
 
-  - name: set PULL_SECRET in {{ base_path }}/dev-scripts/config_$USER.sh
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export PULL_SECRET='
-      line: export PULL_SECRET=$(cat "{{ secrets_repo_path }}/pull-secret")
+  - name: Prepare dev-scripts configuration
+    when: not use_kni_ipi_virt
+    block:
+    - name: Copy the config_example.sh to config_$USER.sh
+      copy:
+        src: "{{ base_path }}/dev-scripts/config_example.sh"
+        dest: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        mode: 0755
+        remote_src: yes
 
-  - name: set IP_STACK in {{ base_path }}/dev-scripts/config_$USER.sh
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export IP_STACK='
-      line: export IP_STACK='{{ ocp_ip_stack }}'
+    - name: set OCP release to use
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export OPENSHIFT_RELEASE_IMAGE=.*'
+        line: "export OPENSHIFT_RELEASE_IMAGE={{ ocp_release_image }}"
 
-  - name: set CLUSTER_NAME in {{ base_path }}/dev-scripts/config_$USER.sh
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export CLUSTER_NAME='
-      line: export CLUSTER_NAME='{{ ocp_cluster_name }}'
+    - name: set WORKING_DIR in {{ base_path }}/dev-scripts/config_$USER.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export WORKING_DIR='
+        line: export WORKING_DIR='{{ base_path }}'
 
-  - name: set OCP number of workers
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export NUM_WORKERS=.*'
-      line: "export NUM_WORKERS={{ ocp_num_workers }}"
+    - name: set PULL_SECRET in {{ base_path }}/dev-scripts/config_$USER.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export PULL_SECRET='
+        line: export PULL_SECRET=$(cat "{{ secrets_repo_path }}/pull-secret")
 
-  - name: set OCP number of masters
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export NUM_MASTERS=.*'
-      line: "export NUM_MASTERS={{ ocp_num_masters | default('3', true)}}"
+    - name: set IP_STACK in {{ base_path }}/dev-scripts/config_$USER.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export IP_STACK='
+        line: export IP_STACK='{{ ocp_ip_stack }}'
 
-  - name: set OCP master memory
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export MASTER_MEMORY=.*'
-      line: "export MASTER_MEMORY={{ ocp_master_memory }}"
+    - name: set CLUSTER_NAME in {{ base_path }}/dev-scripts/config_$USER.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export CLUSTER_NAME='
+        line: export CLUSTER_NAME='{{ ocp_cluster_name }}'
 
-  - name: set OCP network type
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export NETWORK_TYPE=.*'
-      line: "export NETWORK_TYPE={{ ocp_network_type }}"
+    - name: set OCP number of workers
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export NUM_WORKERS=.*'
+        line: "export NUM_WORKERS={{ ocp_num_workers }}"
 
-  - name: set OCP master disk
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export MASTER_DISK=.*'
-      line: "export MASTER_DISK={{ ocp_master_disk }}"
+    - name: set OCP number of masters
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export NUM_MASTERS=.*'
+        line: "export NUM_MASTERS={{ ocp_num_masters | default('3', true)}}"
 
-  - name: set OCP master vcpus
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export MASTER_VCPU=.*'
-      line: "export MASTER_VCPU={{ ocp_master_vcpu }}"
+    - name: set OCP master memory
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export MASTER_MEMORY=.*'
+        line: "export MASTER_MEMORY={{ ocp_master_memory }}"
 
-  - name: set OCP worker memory
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export WORKER_MEMORY=.*'
-      line: "export WORKER_MEMORY={{ ocp_worker_memory }}"
+    - name: set OCP network type
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export NETWORK_TYPE=.*'
+        line: "export NETWORK_TYPE={{ ocp_network_type }}"
 
-  - name: set OCP worker disk
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export WORKER_DISK=.*'
-      line: "export WORKER_DISK={{ ocp_worker_disk }}"
+    - name: set OCP master disk
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export MASTER_DISK=.*'
+        line: "export MASTER_DISK={{ ocp_master_disk }}"
 
-  - name: set OCP worker vcpus
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export WORKER_VCPU=.*'
-      line: "export WORKER_VCPU={{ ocp_worker_vcpu }}"
+    - name: set OCP master vcpus
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export MASTER_VCPU=.*'
+        line: "export MASTER_VCPU={{ ocp_master_vcpu }}"
+
+    - name: set OCP worker memory
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export WORKER_MEMORY=.*'
+        line: "export WORKER_MEMORY={{ ocp_worker_memory }}"
+
+    - name: set OCP worker disk
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export WORKER_DISK=.*'
+        line: "export WORKER_DISK={{ ocp_worker_disk }}"
+
+    - name: set OCP worker vcpus
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+        regexp: '^export WORKER_VCPU=.*'
+        line: "export WORKER_VCPU={{ ocp_worker_vcpu }}"
+
+
+  - name: Prepare kni-ipi-virt configuration
+    when: use_kni_ipi_virt
+    block:
+    - name: set OCP release to use
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export OCP_VERSION=.*'
+        line: 'export OCP_VERSION={{ ocp_release_image.split(":")[1].split("-")[0] }}'
+
+    - name: set CLUSTER_CONFIGS_DIR in {{ base_path }}/dev-scripts/common.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export CLUSTER_CONFIGS_DIR='
+        line: 'export CLUSTER_CONFIGS_DIR="{{ base_path }}/dev-scripts/ocp/{{ ocp_cluster_name }}"'
+
+    - name: set PROJECT_DIR in {{ base_path }}/dev-scripts/common.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export PROJECT_DIR='
+        line: export PROJECT_DIR="{{ base_path }}/dev-scripts"
+
+    - name: set PULL_SECRET in {{ base_path }}/dev-scripts/common.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export PULL_SECRET_PATH='
+        line: export PULL_SECRET_PATH="{{ secrets_repo_path }}/pull-secret"
+
+    - name: set CLUSTER_DOMAIN in {{ base_path }}/dev-scripts/common.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export CLUSTER_DOMAIN='
+        line: export CLUSTER_DOMAIN=test.metalkube.org
+
+    - name: set CLUSTER_NAME in {{ base_path }}/dev-scripts/common.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export CLUSTER_NAME='
+        line: export CLUSTER_NAME='{{ ocp_cluster_name }}'
+
+    - name: set BM_CIDR in {{ base_path }}/dev-scripts/common.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export BM_CIDR='
+        line: export BM_CIDR='192.168.111.0/24'
+
+    - name: set BM_GW_IP in {{ base_path }}/dev-scripts/common.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export BM_GW_IP='
+        line: export BM_GW_IP='192.168.111.1'
+
+    - name: set DNS_VIP in {{ base_path }}/dev-scripts/common.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export DNS_VIP='
+        line: export DNS_VIP='192.168.111.3'
+
+    - name: set INGRESS_VIP in {{ base_path }}/dev-scripts/common.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export INGRESS_VIP='
+        line: export INGRESS_VIP='192.168.111.4'
+
+    - name: set API_VIP in {{ base_path }}/dev-scripts/common.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export API_VIP='
+        line: export API_VIP='192.168.111.5'
+
+    - name: set OCP number of workers
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export NUM_WORKERS=.*'
+        line: "export NUM_WORKERS={{ ocp_num_workers }}"
+
+    - name: set OCP number of masters
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export NUM_MASTERS=.*'
+        line: "export NUM_MASTERS={{ ocp_num_masters | default('3', true)}}"
+
+    - name: set OCP master memory
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export MASTER_MEM=.*'
+        line: "export MASTER_MEM={{ ocp_master_memory }}"
+
+    - name: set OCP master vcpus
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export MASTER_CPUS=.*'
+        line: "export MASTER_CPUS={{ ocp_master_vcpu }}"
+
+    - name: set OCP worker memory
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export WORKER_MEM=.*'
+        line: "export WORKER_MEM={{ ocp_worker_memory }}"
+
+    - name: set OCP worker vcpus
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export WORKER_CPUS=.*'
+        line: "export WORKER_CPUS={{ ocp_worker_vcpu }}"
+
+    - name: use remote registry for OCP images
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export CREATE_LOCAL_REG=.*'
+        line: "export CREATE_LOCAL_REG=false"

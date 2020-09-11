@@ -1,0 +1,276 @@
+---
+- hosts: convergence_base
+  gather_facts: false
+  become: true
+  user: root
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+
+  tasks:
+  - name: Provision storage nodes and install OCS
+    when: ocs_enabled == true and use_kni_ipi_virt == true
+    block:
+    - name: Install non-pip dependencies
+      package:
+        name: "{{ item }}"
+        state: latest
+      with_items:
+        - virt-install
+
+    - name: Install pip dependencies
+      command: "pip3 install {{ item }}"
+      with_items:
+        - virtualbmc
+
+    - name: Clear host VM memory cache
+      shell: echo 3 | tee /proc/sys/vm/drop_caches
+
+    - name: Create storage VMs
+      shell: |
+        virt-install --ram 32768 --vcpus 12 --os-variant rhel8.0 --cpu host-passthrough \
+        --disk size={{ ocp_worker_disk }},pool=default,device=disk,bus=virtio,format=qcow2 --import --noautoconsole \
+        --vnc --network=bridge:provisioning,mac="52:54:00:82:68:6{{ item }}" \
+        --network=bridge:baremetal,mac="52:54:00:82:69:6{{ item }}" --name "{{ ocp_cluster_name}}-storage-{{ item }}" \
+        --os-type=linux --events on_reboot=restart --boot hd,network --noreboot
+      register: create_vms
+      failed_when: create_vms.stderr != "" and "is in use by another virtual machine" not in create_vms.stderr
+      with_items:
+        - 0
+        - 1
+        - 2
+
+    - name: Read host {{ ocs_device }} information
+      parted: device={{ ocs_device }} unit=MiB
+      register: device_info
+
+    - name: Create partitions on {{ ocs_device }}
+      shell: |
+        parted {{ ocs_device }} mkpart primary ext2 0% 10%;
+        parted {{ ocs_device }} mkpart primary ext2 10% 20%;
+        parted {{ ocs_device }} mkpart primary ext2 20% 30%;
+        parted {{ ocs_device }} mkpart extended 30% 100%;
+        parted {{ ocs_device }} mkpart logical ext2 40% 50%;
+        parted {{ ocs_device }} mkpart logical ext2 50% 60%;
+        parted {{ ocs_device }} mkpart logical ext2 60% 70%;
+        parted {{ ocs_device }} mkpart logical ext2 70% 80%;
+        parted {{ ocs_device }} mkpart logical ext2 80% 90%;
+        parted {{ ocs_device }} mkpart logical ext2 90% 100%
+      when: (device_info.partitions | length) == 0
+
+    - name: attach disks to storage VMs
+      command: "{{ item }}"
+      register: attach_disks
+      failed_when: attach_disks.stderr != "" and "already exists" not in attach_disks.stderr
+      with_items:
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-0 --source {{ ocs_device }}1 --target vdb --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-0 --source {{ ocs_device }}2 --target vdc --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-0 --source {{ ocs_device }}3 --target vdd --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-1 --source {{ ocs_device }}5 --target vdb --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-1 --source {{ ocs_device }}6 --target vdc --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-1 --source {{ ocs_device }}7 --target vdd --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-2 --source {{ ocs_device }}8 --target vdb --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-2 --source {{ ocs_device }}9 --target vdc --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-2 --source {{ ocs_device }}10 --target vdd --persistent"     
+
+    - name: Create and start storage VM vbmcs
+      shell: |
+        vbmc add "{{ ocp_cluster_name}}-storage-{{ item }}" --port "626{{ item }}" --username ADMIN --password ADMIN;
+        vbmc start "{{ ocp_cluster_name}}-storage-{{ item }}"
+      with_items:
+        - 0
+        - 1
+        - 2
+
+    - name: Open ports for storage VM vbmcs in firewalld
+      firewalld:
+        port: "626{{ item }}/udp"
+        permanent: yes
+        state: enabled
+        zone: "public"
+        immediate: yes
+      with_items:
+        - 0
+        - 1
+        - 2
+    
+    - name: Shutdown storage VMs using IPMI via vbmcs
+      shell: ipmitool -I lanplus -U ADMIN -P ADMIN -H 127.0.0.1 -p "626{{ item }}" power off
+      retries: 2
+      with_items:
+        - 0
+        - 1
+        - 2
+
+    - name: Add storage VM hostnames and IPs to DHCP server
+      blockinfile:
+        path: "{{ base_path }}/dev-scripts/dhcp/generated/bm/etc/dnsmasq.d/dnsmasq.hostsfile"
+        block: |
+          52:54:00:82:69:60,192.168.111.140,{{ ocp_cluster_name }}-storage-0.{{ ocp_cluster_name }}.test.metalkube.org
+          52:54:00:82:69:61,192.168.111.141,{{ ocp_cluster_name }}-storage-1.{{ ocp_cluster_name }}.test.metalkube.org
+          52:54:00:82:69:62,192.168.111.142,{{ ocp_cluster_name }}-storage-2.{{ ocp_cluster_name }}.test.metalkube.org
+    
+    - name: Restart DHCP server
+      shell: |
+        podman stop ipi-dnsmasq-bm;
+        podman start ipi-dnsmasq-bm
+
+    - name: Add storage VM hostnames and IP octet to DNS server
+      blockinfile:
+        path: "{{ base_path }}/dev-scripts/dns/generated/db.reverse"
+        block: |
+          140 IN  PTR {{ ocp_cluster_name }}-storage-0.{{ ocp_cluster_name }}.test.metalkube.org.
+          141 IN  PTR {{ ocp_cluster_name }}-storage-1.{{ ocp_cluster_name }}.test.metalkube.org.
+          142 IN  PTR {{ ocp_cluster_name }}-storage-2.{{ ocp_cluster_name }}.test.metalkube.org.
+
+    - name: Add storage VM hostnames and IPs DNS server
+      blockinfile:
+        path: "{{ base_path }}/dev-scripts/dns/generated/db.zone"
+        block: |
+          {{ ocp_cluster_name }}-storage-0                          A 192.168.111.140
+          {{ ocp_cluster_name }}-storage-1                          A 192.168.111.141
+          {{ ocp_cluster_name }}-storage-2                          A 192.168.111.142
+
+    - name: Restart DNS server
+      shell: |
+        podman stop ipi-coredns;
+        podman start ipi-coredns
+      become: yes
+      become_user: ocp
+
+    - name: Create OCS YAMLs working dir
+      file:
+        path: "{{ working_yamls_dir }}/ocs"
+        state: directory
+        mode: 0755
+
+    - name: Write OCS YAMLs to working dir
+      template:
+        src: ocs/{{ item }}.yaml.j2
+        dest: "{{ working_yamls_dir }}/ocs/{{ item }}.yaml"
+      with_items:
+        - bmhs
+        - local-storage-sub
+        - local-storage-volumes
+        - machineset
+        - ocs-storage-cluster
+        - ocs-sub
+
+    - name: Create storage machineset in OCP
+      shell: |
+        oc apply -f {{ working_yamls_dir }}/ocs/machineset.yaml -n openshift-machine-api
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Create storage baremetal hosts in OCP
+      shell: |
+        oc apply -f {{ working_yamls_dir }}/ocs/bmhs.yaml -n openshift-machine-api
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait for storage baremetal hosts to become ready
+      shell: oc get bmh -l test-storage=yes -n openshift-machine-api
+      retries: 100
+      delay: 30
+      register: storage_bmhs_ready
+      until: (storage_bmhs_ready.stdout | regex_findall('OK       ready') | length) == 3
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Scale storage machineset to 3
+      shell: oc scale machineset/{{ ocp_cluster_name }}-storage-0 --replicas=3 -n openshift-machine-api
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait for storage nodes to be provisioned
+      shell: oc get nodes -l node-role.kubernetes.io/storage
+      retries: 100
+      delay: 30
+      register: storage_nodes_ready
+      until: (storage_nodes_ready.stdout | regex_findall('Ready    storage') | length) == 3
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Label storage nodes as local-storage capable
+      shell: |
+        for i in $(oc get nodes --no-headers -l node-role.kubernetes.io/storage -o name); do
+          oc label $i cluster.ocs.openshift.io/openshift-storage=''
+        done
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+    
+    - name: Deploy local-storage subscription
+      shell: |
+        oc new-project local-storage
+        oc annotate project local-storage --overwrite openshift.io/node-selector=''
+        oc apply -f {{ working_yamls_dir }}/ocs/local-storage-sub.yaml
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait for local-storage operator to be ready
+      shell: oc get pods -n local-storage
+      retries: 100
+      delay: 20
+      register: local_storage_operator_ready
+      until: (local_storage_operator_ready.stdout | regex_findall('local-storage-operator-.+-.+Running') | length) == 1
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Create local-storage PVs
+      shell: |
+        oc apply -f {{ working_yamls_dir }}/ocs/local-storage-volumes.yaml
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait for local-storage PVs to be ready
+      shell: oc get pv -n local-storage
+      retries: 100
+      delay: 20
+      register: local_storage_volumes_ready
+      until: (local_storage_volumes_ready.stdout | regex_findall('local-pv-.+Available') | length) == (local_storage_volumes_ready.stdout | regex_findall('local-pv-.+') | length) and (local_storage_volumes_ready.stdout | regex_findall('local-pv-.+Available') | length) != 0
+
+    - name: Deploy OCS subscription
+      shell: oc apply -f {{ working_yamls_dir }}/ocs/ocs-sub.yaml
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait for OCS, rook-ceph and noobaa operators to be ready
+      shell: oc get pods -n openshift-storage
+      retries: 100
+      delay: 20
+      register: ocs_operators_ready
+      until: (ocs_operators_ready.stdout | regex_findall('ocs-operator-.+-.+Running') | length) == 1 and (ocs_operators_ready.stdout | regex_findall('rook-ceph-operator-.+-.+Running') | length) == 1 and (ocs_operators_ready.stdout | regex_findall('noobaa-operator-.+-.+Running') | length) == 1
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Deploy OCS cluster
+      shell: oc apply -f {{ working_yamls_dir }}/ocs/ocs-storage-cluster.yaml
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait for OCS pods to be ready
+      shell: oc get pods -n openshift-storage
+      retries: 100
+      delay: 30
+      register: ocs_pods_ready
+      until: ((ocs_pods_ready.stdout | regex_findall('csi-cephfsplugin-.+Running') | length) == (ocs_pods_ready.stdout | regex_findall('csi-cephfsplugin-.+') | length) and (ocs_pods_ready.stdout | regex_findall('csi-cephfsplugin-.+Running') | length) != 0)
+             and ((ocs_pods_ready.stdout | regex_findall('csi-rbdplugin-.+Running') | length) == (ocs_pods_ready.stdout | regex_findall('csi-rbdplugin-.+') | length) and (ocs_pods_ready.stdout | regex_findall('csi-rbdplugin-.+Running') | length) != 0)
+             and ((ocs_pods_ready.stdout | regex_findall('rook-ceph-mon-.+Running') | length) == (ocs_pods_ready.stdout | regex_findall('rook-ceph-mon-.+') | length) and (ocs_pods_ready.stdout | regex_findall('rook-ceph-mon-.+Running') | length) != 0)
+             and ((ocs_pods_ready.stdout | regex_findall('rook-ceph-osd-\d-.+Running') | length) == (ocs_pods_ready.stdout | regex_findall('rook-ceph-osd-\d-.+') | length) and (ocs_pods_ready.stdout | regex_findall('rook-ceph-osd-\d-.+Running') | length) != 0)
+             and ((ocs_pods_ready.stdout | regex_findall('noobaa-core-0.+Running') | length) == 1)
+             and ((ocs_pods_ready.stdout | regex_findall('noobaa-db-0.+Running') | length) == 1)
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"

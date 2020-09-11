@@ -38,7 +38,7 @@
       set -e -o pipefail
 
       oc get -n openshift-machine-api bmh --no-headers -o custom-columns=name:.metadata.name | \
-          grep "^{{ ocp_cluster_name }}-worker-"
+          grep "worker-"
     environment:
       <<: *oc_env
     register: baremetalhosts_out

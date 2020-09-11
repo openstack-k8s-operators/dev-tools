@@ -11,13 +11,13 @@
 
 - name: open nfsv4 port 2049/tcp (permanent config)
   firewalld:
-    zone: libvirt
+    zone: "{{ (use_kni_ipi_virt) | ternary('public','libvirt') }}"
     port: 2049/tcp
     permanent: yes
     state: enabled
 
 - name: open nfsv4 port 2049/tcp (running config)
   firewalld:
-    zone: libvirt
+    zone: "{{ (use_kni_ipi_virt) | ternary('public','libvirt') }}"
     port: 2049/tcp
     state: enabled

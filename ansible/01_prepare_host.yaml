@@ -21,7 +21,8 @@
         state: absent
       with_items: "{{ beaker_files_to_delete.files }}"
 
-  - name: Register host to subscription manager, metal3 dev scripts use subscription manager for RHEL
+  - name: Register host to subscription manager, {{ (use_kni_ipi_virt) | ternary('kni-ipi-virt uses','metal3 dev scripts use') }} subscription manager for RHEL
+    when: not skip_subscription
     block:
     - name: Install and execute rhos-release.
       import_role:
@@ -96,6 +97,7 @@
           - vim-enhanced
           - tmux
           - mlocate
+          - net-tools
           - sysstat
           - cronie
           - libvirt-daemon-kvm
@@ -278,13 +280,14 @@
       name: ocp
       state: present
 
-  - name: Create user to run metal3 installer dev scripts
+  - name: create ocp user to run {{ (use_kni_ipi_virt) | ternary('kni-ipi-virt','metal3 installer dev-scripts') }} 
     user:
       name: ocp
       comment: ocp user
       shell: /bin/bash
       group: ocp
       groups: wheel
+      generate_ssh_key: yes
 
   - name: make sure /home/ocp is world readable
     file:

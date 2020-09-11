@@ -87,6 +87,11 @@ olm: hosts local-defaults.yaml
 	install_namespace.yaml \
 	olm.yaml
 
+ocs: hosts local-defaults.yaml
+	ANSIBLE_FORCE_COLOR=true ansible-playbook \
+	-v -i hosts -e @local-defaults.yaml \
+	ocs.yaml
+
 openstackclient: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-v -i hosts -e @local-defaults.yaml \
@@ -114,7 +119,7 @@ ocp_cleanup: hosts
 	ANSIBLE_FORCE_COLOR=true ansible -i hosts convergence_base \
 	--become --become-user ocp \
 	-m shell -a "cd /home/ocp/dev-scripts && make clean"
-	$(MAKE) nfs_cleanup
+	$(MAKE) nfs_cleanup 
 
 demo: hosts
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
@@ -125,3 +130,8 @@ osp_cleanup: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-v -i hosts -e @local-defaults.yaml \
 	osp_cleanup.yaml
+
+ocs_cleanup: hosts local-defaults.yaml
+	ANSIBLE_FORCE_COLOR=true ansible-playbook \
+	-v -i hosts -e @local-defaults.yaml \
+	ocs_cleanup.yaml

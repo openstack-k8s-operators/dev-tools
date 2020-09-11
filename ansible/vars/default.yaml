@@ -1,7 +1,12 @@
 ---
 base_path: /home/ocp
-#dev_scripts_repo: defaults to "https://github.com/openshift-metal3/dev-scripts.git"
+
+#skip_subscription: true # set to true if you set subscription configuration manually before using this tool
+
+# OCP deployment fields
+#dev_scripts_repo: https://github.com/redhat-nfvpe/kni-ipi-virt.git # defaults to "https://github.com/openshift-metal3/dev-scripts.git"
 #dev_scripts_branch: defaults to "HEAD"
+use_kni_ipi_virt: "{{ dev_scripts_repo is defined and (dev_scripts_repo | regex_findall('kni-ipi-virt') | length) > 0 }}"
 
 # To set a specific release to install.
 ocp_release_image: quay.io/openshift-release-dev/ocp-release:4.5.8-x86_64
@@ -41,6 +46,9 @@ ocp_worker_disk: 120
 
 # OCP cluster name
 ocp_cluster_name: ostest
+
+# Kubeconfig default path
+kubeconfig_path: "{{ base_path }}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
 
 # Released version of the opm package from the operator-framework
 opm_version: v1.12.5
@@ -87,4 +95,8 @@ default_timeout: 180
 
 # worker node where openstackclient pod will run
 openstackclient_pod_worker: worker-0
+
+# ocs specific
+ocs_enabled: true   # NOTE: requires use_kni_ipi_virt to be true
+ocs_device: /dev/sdb
 

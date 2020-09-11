@@ -1,0 +1,173 @@
+---
+- hosts: convergence_base
+  gather_facts: false
+  become: true
+  user: root
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+
+  tasks:
+  - name: Remove OCS and de-provision storage nodes
+    when: ocs_enabled == true and use_kni_ipi_virt == true
+    block:
+    - name: Delete OCS storage cluster object
+      shell: oc delete --ignore-not-found -f {{ working_yamls_dir }}/ocs/ocs-storage-cluster.yaml
+      register: remove_ocs_storage_cluster
+      failed_when: remove_ocs_storage_cluster.stderr != "" and ("not found" not in remove_ocs_storage_cluster.stderr and "no matches for kind" not in remove_ocs_storage_cluster.stderr)
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait until rook-ceph-mon, rook-ceph-osd and non-operator-noobaa pods are removed
+      shell: oc get pods -n openshift-storage
+      retries: 100
+      delay: 15
+      register: ocs_pods_removed
+      until: (ocs_pods_removed.stdout | regex_findall('rook-ceph-mon-') | length) == 0 and (ocs_pods_removed.stdout | regex_findall('rook-ceph-osd-') | length) == 0
+             and (ocs_pods_removed.stdout | regex_findall('noobaa-') | length) <= 1
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+    
+    - name: Delete OCS subscription
+      shell: oc delete --ignore-not-found -f {{ working_yamls_dir }}/ocs/ocs-sub.yaml
+      register: remove_ocs_sub
+      failed_when: remove_ocs_sub.stderr != "" and ("not found" not in remove_ocs_sub.stderr and "no matches for kind" not in remove_ocs_sub.stderr)
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait until openshift-storage namespace is removed
+      shell: oc get namespace
+      retries: 100
+      delay: 15
+      register: ocs_namespace_removed
+      until: (ocs_namespace_removed.stdout | regex_findall('openshift-storage') | length) == 0
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Delete local-storage localvolume objects
+      shell: oc delete --ignore-not-found -f {{ working_yamls_dir }}/ocs/local-storage-volumes.yaml
+      register: remove_local_storage_volumes
+      failed_when: remove_local_storage_volumes.stderr != "" and ("not found" not in remove_local_storage_volumes.stderr and "no matches for kind" not in remove_local_storage_volumes.stderr)
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Delete local-storage pvs
+      shell: |
+        for i in $(oc get pv -n local-storage -l storage.openshift.com/local-volume-owner-name=local-disks --no-headers -o name); do
+          oc delete $i
+        done
+      register: remove_local_storage_pvs
+      failed_when: remove_local_storage_pvs.stderr != "" and "not found" not in remove_local_storage_pvs.stderr
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"      
+
+    - name: Delete local-storage subscription
+      shell: oc delete --ignore-not-found -f {{ working_yamls_dir }}/ocs/local-storage-sub.yaml
+      register: remove_local_storage_sub
+      failed_when: remove_local_storage_sub.stderr != "" and ("not found" not in remove_local_storage_sub.stderr and "no matches for kind" not in remove_local_storage_sub.stderr)
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait until local-storage namespace is removed
+      shell: oc get namespace
+      retries: 100
+      delay: 15
+      register: local_storage_namespace_removed
+      until: (local_storage_namespace_removed.stdout | regex_findall('local-storage') | length) == 0
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Scale storage machineset to 0
+      shell: oc scale machineset/{{ ocp_cluster_name }}-storage-0 --replicas=0 -n openshift-machine-api
+      register: scale_machineset
+      failed_when: scale_machineset.stderr != "" and "not found" not in scale_machineset.stderr
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait for storage nodes to be de-provisioned
+      shell: oc get nodes -l node-role.kubernetes.io/storage
+      retries: 100
+      delay: 30
+      register: storage_nodes_removed
+      until: "'-storage-' not in storage_nodes_removed.stdout"
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Delete storage machineset
+      shell: oc delete --ignore-not-found machineset/{{ ocp_cluster_name }}-storage-0 -n openshift-machine-api
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Remove storage baremetal hosts from OCP
+      shell: oc delete --ignore-not-found bmh/storage-{{ item }} -n openshift-machine-api
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+      with_items:
+        - 0
+        - 1
+        - 2
+
+    - name: Stop and delete storage VM vbmcs
+      shell: |
+        vbmc stop {{ item }};
+        vbmc delete {{ item }}
+      register: remove_vbmcs
+      failed_when: remove_vbmcs.stderr != "" and "No domain with matching name" not in remove_vbmcs.stderr
+      with_items:
+        - "{{ ocp_cluster_name }}-storage-0"
+        - "{{ ocp_cluster_name }}-storage-1"
+        - "{{ ocp_cluster_name }}-storage-2"
+
+    - name: Destroy and undefine storage VMs
+      shell: |
+        virsh destroy {{ item }};
+        virsh undefine {{ item }}
+      register: remove_vms
+      failed_when: remove_vms.stderr != "" and ("failed to get domain" not in remove_vms.stderr and "domain is not running" not in remove_vms.stderr)
+      with_items:
+        - "{{ ocp_cluster_name }}-storage-0"
+        - "{{ ocp_cluster_name }}-storage-1"
+        - "{{ ocp_cluster_name }}-storage-2"
+      
+    - name: Remove storage VM qcow2s
+      command: "virsh vol-delete {{ item }}.qcow2 --pool=default"
+      register: remove_vm_volumes
+      failed_when: remove_vm_volumes.stderr != "" and "Storage volume not found" not in remove_vm_volumes.stderr
+      with_items:
+        - "{{ ocp_cluster_name }}-storage-0"
+        - "{{ ocp_cluster_name }}-storage-1"
+        - "{{ ocp_cluster_name }}-storage-2"
+
+    - name: Get list of lingering OCS VGs, if any
+      shell: |
+        vgs --noheadings -o vg_name
+      register: ocs_vgs
+
+    - name: Delete lingering OCS VGs, if any
+      command: vgremove {{ item }} -y
+      with_items: "{{ ocs_vgs.stdout_lines }}"
+      when:
+        - (item | regex_findall('ceph-') | length) > 0
+
+    - name: Read host {{ ocs_device }} information
+      parted: device={{ ocs_device }} unit=MiB
+      register: device_info
+
+    - name: Remove partitions on host {{ ocs_device }}
+      parted:
+        device: '{{ ocs_device }}'
+        number: '{{ item.num }}'
+        state: absent
+      loop: '{{ device_info.partitions }}'

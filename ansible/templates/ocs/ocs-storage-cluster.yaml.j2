@@ -1,0 +1,27 @@
+
+apiVersion: ocs.openshift.io/v1
+kind: StorageCluster
+metadata:
+  namespace: openshift-storage
+  name: storagecluster
+spec:
+  manageNodes: false
+  monDataDirHostPath: /var/lib/rook
+  storageDeviceSets:
+    - name: deviceset-0
+      count: 3
+      replica: 3
+      resources:
+         requests: {}
+         limits: {}
+      placement: {}
+      dataPVCTemplate:
+        spec:
+          storageClassName: localblock-sc
+          accessModes:
+            - ReadWriteOnce
+          volumeMode: Block
+          resources:
+            requests:
+              storage: 180Gi
+      portable: false

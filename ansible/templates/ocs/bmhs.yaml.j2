@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: storage-0-bmc-secret
+type: Opaque
+data:
+  username: QURNSU4=
+  password: QURNSU4=
+---
+apiVersion: metal3.io/v1alpha1
+kind: BareMetalHost
+metadata:
+  name: storage-0
+  labels:
+    test-storage: "yes"
+spec:
+  online: true
+  bootMACAddress: 52:54:00:82:68:60 
+  bmc:
+    address: ipmi://192.168.111.1:6260
+    credentialsName: storage-0-bmc-secret 
+  hardwareProfile: libvirt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: storage-1-bmc-secret
+type: Opaque
+data:
+  username: QURNSU4=
+  password: QURNSU4=
+---
+apiVersion: metal3.io/v1alpha1
+kind: BareMetalHost
+metadata:
+  name: storage-1
+  labels:
+    test-storage: "yes"
+spec:
+  online: true
+  bootMACAddress: 52:54:00:82:68:61 
+  bmc:
+    address: ipmi://192.168.111.1:6261
+    credentialsName: storage-1-bmc-secret 
+  hardwareProfile: libvirt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: storage-2-bmc-secret
+type: Opaque
+data:
+  username: QURNSU4=
+  password: QURNSU4=
+---
+apiVersion: metal3.io/v1alpha1
+kind: BareMetalHost
+metadata:
+  name: storage-2
+  labels:
+    test-storage: "yes"
+spec:
+  online: true
+  bootMACAddress: 52:54:00:82:68:62 
+  bmc:
+    address: ipmi://192.168.111.1:6262
+    credentialsName: storage-2-bmc-secret 
+  hardwareProfile: libvirt
