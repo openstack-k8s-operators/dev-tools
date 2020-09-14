@@ -22,7 +22,7 @@
       with_items: "{{ beaker_files_to_delete.files }}"
 
   - name: Register host to subscription manager, {{ (use_kni_ipi_virt) | ternary('kni-ipi-virt uses','metal3 dev scripts use') }} subscription manager for RHEL
-    when: not skip_subscription
+    when: not (skip_subscription | default(false))
     block:
     - name: Install and execute rhos-release.
       import_role:
