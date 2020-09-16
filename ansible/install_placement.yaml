@@ -16,44 +16,34 @@
       path: "{{ placement_yaml_dir }}"
       state: directory
 
-  - name: Copy deployment yamls to working dir
+  - name: Copy files to yaml dir
     copy:
       src: "{{ item }}"
       dest: "{{ placement_yaml_dir }}/"
-    loop:
-    - "ocp/placement/1"
-    - "ocp/placement/2"
-    - "ocp/placement/3"
-
-  - name: Create database
-    shell: |
-      set -e
-
-      oc apply -f "{{ placement_yaml_dir }}/1/"
-      oc wait -n openstack job/placement-dbcreate \
-          --for condition=Complete --timeout={{ default_timeout }}s
-    environment:
-      PATH: "{{ oc_env_path }}"
-      KUBECONFIG: "{{ kubeconfig }}"
-
-  - name: Create db schema
-    shell: |
-      set -e
-
-      oc apply -f "{{ placement_yaml_dir }}/2/"
-      oc wait -n openstack job/placement-dbsync \
-          --for condition=Complete --timeout={{ default_timeout }}s
-      oc wait -n openstack job/placement-service-init \
-          --for condition=Complete --timeout={{ default_timeout }}s
-    environment:
-      PATH: "{{ oc_env_path }}"
-      KUBECONFIG: "{{ kubeconfig }}"
+    with_fileglob:
+    - "ocp/placement/*"
 
   - name: Start placement
     shell: |
       set -e
+      oc apply -n openstack -f "{{ placement_yaml_dir }}"
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
 
-      oc apply -f "{{ placement_yaml_dir }}/3/"
+  - name: wait for deployment to be created
+    shell: |
+      oc get -n openstack deployment/placement
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+    register: placement_deployment
+    until: placement_deployment is not failed
+    retries: "{{ (default_timeout / 5)|int }}"
+    delay: 5
+
+  - name: wait for deployment to become available
+    shell: |
       oc wait -n openstack deployment/placement \
           --for condition=available --timeout={{ default_timeout }}s
     environment:
