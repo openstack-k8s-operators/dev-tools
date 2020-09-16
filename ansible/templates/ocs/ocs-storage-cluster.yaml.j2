@@ -23,5 +23,5 @@ spec:
           volumeMode: Block
           resources:
             requests:
-              storage: 180Gi
+              storage: "{{ device_info.partitions[0].size | int}}Gi"
       portable: false

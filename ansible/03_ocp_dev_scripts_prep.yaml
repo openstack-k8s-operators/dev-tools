@@ -209,6 +209,18 @@
         regexp: '^export API_VIP='
         line: export API_VIP='192.168.111.5'
 
+    - name: set PROV_BRIDGE in {{ base_path }}/dev-scripts/common.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export PROV_BRIDGE='
+        line: "export PROV_BRIDGE='{{ ocp_cluster_name }}pr'"
+
+    - name: set BM_BRIDGE in {{ base_path }}/dev-scripts/common.sh
+      lineinfile:
+        path: "{{ base_path }}/dev-scripts/common.sh"
+        regexp: '^export BM_BRIDGE='
+        line: "export BM_BRIDGE='{{ ocp_cluster_name }}bm'"
+
     - name: set OCP number of workers
       lineinfile:
         path: "{{ base_path }}/dev-scripts/common.sh"

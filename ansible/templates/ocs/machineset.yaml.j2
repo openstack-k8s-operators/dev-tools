@@ -29,7 +29,7 @@ spec:
             matchLabels:
               test-storage: "yes"
           image:
-            checksum: http://172.22.0.3:6180/images/rhcos-45.82.202008010929-0-openstack.x86_64.qcow2/rhcos-45.82.202008010929-0-compressed.x86_64.qcow2.md5sum
-            url: http://172.22.0.3:6180/images/rhcos-45.82.202008010929-0-openstack.x86_64.qcow2/rhcos-45.82.202008010929-0-compressed.x86_64.qcow2
+            checksum: "{{ worker_ms_json.stdout | from_json | json_query('spec.template.spec.providerSpec.value.image.checksum') }}"
+            url: "{{ worker_ms_json.stdout | from_json | json_query('spec.template.spec.providerSpec.value.image.url') }}"
           userData:
             name: worker-user-data
