@@ -1,0 +1,35 @@
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: {{ ocp_cluster_name }} 
+  name: {{ ocp_cluster_name }}-storage-0
+  namespace: openshift-machine-api
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: {{ ocp_cluster_name }} 
+      machine.openshift.io/cluster-api-machineset: {{ ocp_cluster_name }}-storage-0
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: {{ ocp_cluster_name }} 
+        machine.openshift.io/cluster-api-machine-role: storage
+        machine.openshift.io/cluster-api-machine-type: storage
+        machine.openshift.io/cluster-api-machineset: {{ ocp_cluster_name }}-storage-0
+    spec:
+      metadata:
+        labels:
+          node-role.kubernetes.io/storage: ""
+      providerSpec:
+        value:
+          hostSelector:
+            matchLabels:
+              test-storage: "yes"
+          image:
+            checksum: "{{ worker_ms_json.stdout | from_json | json_query('spec.template.spec.providerSpec.value.image.checksum') }}"
+            url: "{{ worker_ms_json.stdout | from_json | json_query('spec.template.spec.providerSpec.value.image.url') }}"
+          userData:
+            name: worker-user-data

@@ -29,7 +29,7 @@ ocp_num_workers: 5
 ocp_master_memory: 16384
 ocp_master_vcpu: 8
 ocp_master_disk: 120
-ocp_storage_memory: 32768
+ocp_storage_memory: 40960
 ocp_storage_vcpu: 12
 ocp_storage_disk: 120
 ocp_worker_memory: 8192
@@ -96,5 +96,5 @@ default_timeout: 180
 openstackclient_pod_worker: worker-0
 
 # ocs specific
-ocs_enabled: true
+ocs_enabled: false
 ocs_device: /dev/sdb

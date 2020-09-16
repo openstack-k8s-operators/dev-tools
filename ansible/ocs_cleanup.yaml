@@ -21,9 +21,9 @@
 
     - name: Make sure OCS ceph-cluster deployments are deleted
       shell: |
-        for i in $(oc get deployment -n openshift-storage -l app=rook-ceph-osd --no-headers -o name); do 
-          oc delete deployment/$i -n openshift-storage; 
-          done
+        for i in $(oc get deployment -n openshift-storage -l app=rook-ceph-osd --no-headers -o name); do
+          oc delete $i -n openshift-storage
+        done
       environment:
         PATH: "{{ oc_env_path }}"
         KUBECONFIG: "{{ kubeconfig }}"
