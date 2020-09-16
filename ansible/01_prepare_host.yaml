@@ -23,11 +23,11 @@
 
   - name: Register host to subscription manager, metal3 dev scripts use subscription manager for RHEL
     block:
-    - name: Install and execute rhos-release.
-      import_role:
-        name: prepare-rhos-release
-      vars:
-        rhos_release_args: "-x"
+    # - name: Install and execute rhos-release.
+    #   import_role:
+    #     name: prepare-rhos-release
+    #   vars:
+    #     rhos_release_args: "-x"
 
     - name: use local rhel-subscription info
       when: secrets_repo is undefined

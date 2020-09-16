@@ -29,6 +29,9 @@ ocp_num_workers: 5
 ocp_master_memory: 16384
 ocp_master_vcpu: 8
 ocp_master_disk: 120
+ocp_storage_memory: 32768
+ocp_storage_vcpu: 12
+ocp_storage_disk: 120
 ocp_worker_memory: 8192
 ocp_worker_vcpu: 4
 ocp_worker_disk: 120
@@ -41,6 +44,9 @@ ocp_worker_disk: 120
 
 # OCP cluster name
 ocp_cluster_name: ostest
+
+# Kubeconfig default path
+kubeconfig_path: "{{ base_path }}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
 
 # Released version of the opm package from the operator-framework
 opm_version: v1.12.5
@@ -89,3 +95,6 @@ default_timeout: 180
 # worker node where openstackclient pod will run
 openstackclient_pod_worker: worker-0
 
+# ocs specific
+ocs_enabled: true
+ocs_device: /dev/sdb
