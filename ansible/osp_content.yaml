@@ -9,6 +9,8 @@
     shell: |
       set -e -o pipefail
 
+      source {{ working_dir }}/stackrc
+
       if ! [[ $(openstack network list | grep private) ]]; then
         openstack network create private
         openstack subnet create subnet1 --network private --subnet-range 192.168.0.0/24
@@ -31,6 +33,7 @@
   - name: Create test instance
     shell: |
       set -e -o pipefail
+      source {{ working_dir }}/stackrc
       openstack server create --flavor m1.small --image cirros --nic net-id=$(openstack network list --name private -f value -c ID) test
     environment:
       <<: *oc_env

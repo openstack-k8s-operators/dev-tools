@@ -13,15 +13,72 @@
         KUBECONFIG: "{{ kubeconfig }}"
       block:
 
+        - name: delete yamls from working dir
+          file:
+            path: "{{ working_yamls_dir }}"
+            state: absent
+
+        - name: get worker-osp node name
+          shell: |
+            oc get nodes | grep worker-osp | cut -d ' ' -f1
+          register: worker_osp_node
+
+        - name: get worker-osp machine name
+          shell: |
+            oc get -n openshift-machine-api machines | grep worker-osp | cut -d ' ' -f1
+          register: worker_osp_machine
+
+        - name: get worker-osp baremetalhost name
+          shell: |
+            oc get -n openshift-machine-api bmh | grep worker-osp | cut -d ' ' -f1
+          register: worker_osp_bmh
+
         - name: scale osp machineset to 0
           shell: |
-            if oc get -n openshift-machine-api machineset ostest-worker-osp-0; then
-              os scale --replicas 0 machineset ostest-worker-osp-0 --timeout 3m
+            if oc get -n openshift-machine-api machineset ostest-worker-osp; then
+              oc scale -n openshift-machine-api --replicas 0 machineset ostest-worker-osp --timeout 3m
             fi
+
+        - name: wait until worker-osp gets deprovisioned
+          shell: |
+            set -e -o pipefail
+
+            if oc get -n openshift-machine-api machineset ostest-worker-osp 2>/dev/null 1>/dev/null; then
+              oc get -n openshift-machine-api machineset/{{ ocp_cluster_name }}-worker-osp -o json | jq -re '.status.replicas'
+            else
+              echo 0
+            fi
+          register: worker_osp_ready
+          until: worker_osp_ready is not failed and worker_osp_ready.stdout == "0"
+          delay: 3
+          retries: 60
+          tags:
+          - wait
+
+        - name: remove machine finalizers from {{ worker_osp_machine.stdout }}
+          shell: |
+            oc patch -n openshift-machine-api machines  -p '{"metadata":{"finalizers":[]}}' --type merge {{ worker_osp_machine.stdout }}
+          when: worker_osp_machine.stdout != ""
+
+        - name: delete worker-osp node {{ worker_osp_node.stdout }}
+          shell: |
+            oc delete --ignore-not-found node {{ worker_osp_node.stdout }}
+          when: worker_osp_node.stdout != ""
 
         - name: delete osp machineset
           shell: >
-            oc delete --ignore-not-found -n openshift-machine-api machineset ostest-worker-osp-0
+            oc delete --ignore-not-found -n openshift-machine-api machineset ostest-worker-osp
+
+        - name: remove finalizers from blocker pod {{ worker_osp_node.stdout }}-blocker-pod
+          shell: |
+            oc patch -n openstack pod {{worker_osp_node.stdout }}-blocker-pod  -p '{"metadata":{"finalizers":[]}}' --type merge
+          when: worker_osp_node.stdout != ""
+
+        - name: remove consumerRef baremetalhost {{ worker_osp_bmh.stdout }}
+          shell: |
+            oc patch -n openshift-machine-api bmh/{{ worker_osp_bmh.stdout }} -p '[{"op": "remove", "path": "/spec/consumerRef"}]' --type json
+          when: worker_osp_bmh is defined and worker_osp_bmh.stdout != ""
+          ignore_errors: true
 
         - name: delete openstack.org CRD's
           shell: >

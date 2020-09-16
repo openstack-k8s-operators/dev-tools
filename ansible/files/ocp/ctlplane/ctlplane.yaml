@@ -1,0 +1,11 @@
+apiVersion: controlplane.openstack.org/v1beta1
+kind: ControlPlane
+metadata:
+  name: openstack-ctlplane
+  namespace: openstack
+spec:
+  glance:
+    replicas: 1
+  keystone:
+    replicas: 1
+  storage_class: host-nfs-storageclass
