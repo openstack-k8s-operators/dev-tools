@@ -45,7 +45,6 @@
 
         for i in {1..9}; do
             fs="{{ ocs_data_dir }}/ocs_disk_${i}"
-            #base="$(echo "{{ ocs_data_dir }}" | rev | cut -d '/' -f2- | rev )"
 
             if [ ! -f "$fs" ]; then
                 # Create a sparse file of the correct size and populate it with an
@@ -75,6 +74,17 @@
         - "virsh attach-disk {{ ocp_cluster_name }}-storage-2 --source {{ ocs_data_dir }}/ocs_disk_8 --target vdc --persistent"
         - "virsh attach-disk {{ ocp_cluster_name }}-storage-2 --source {{ ocs_data_dir }}/ocs_disk_9 --target vdd --persistent" 
 
+    # This fixes an error that appears *after* dev-scripts has deployed an OCP cluster.
+    # It manifests like so:
+    #
+    # # vbmc add "ostest-storage-0" --address 192.168.111.1 --port "6260" --username ADMIN --password ADMIN;
+    # 2020-09-17 17:51:32,796.796 1090103 ERROR VirtualBMC [-] (1): Command failed: Fail to establish a connection with libvirt 
+    # URI "qemu:///system". Error: Failed to connect socket to '/var/run/libvirt/libvirt-sock-ro': No such file or directory
+    # (1): Command failed: Fail to establish a connection with libvirt URI "qemu:///system". Error: Failed to connect socket 
+    # to '/var/run/libvirt/libvirt-sock-ro': No such file or directory
+    #
+    # Removing the container and re-adding it with the following volume mount fixes the problem:
+    # -v "/var/run/libvirt:/var/run/libvirt:Z"
     - name: Fixes for dev-scripts vbmc container
       block:
       - name: Stop and remove vbmc container
