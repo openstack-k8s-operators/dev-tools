@@ -4,11 +4,9 @@
   become: true
   user: root
   vars_files: vars/default.yaml
-  roles:
-  - oc_local
 
   tasks:
-  - name: Provision storage nodes and install OCS
+  - name: Provision storage nodes
     when: ocs_enabled == true
     block:
     - name: Install non-pip dependencies
@@ -41,60 +39,41 @@
         - 1
         - 2
 
-    - name: Read host {{ ocs_device }} information
-      parted: device={{ ocs_device }} unit=GiB
-      register: device_info
+    - name: Create OCS data disks for VMs
+      shell: |
+        set -e -o pipefail
 
-    - debug:
-        var: device_info
+        for i in {1..9}; do
+            fs="{{ ocs_data_dir }}/ocs_disk_${i}"
+            #base="$(echo "{{ ocs_data_dir }}" | rev | cut -d '/' -f2- | rev )"
 
-    - name: Prepare partitions on {{ ocs_device }}
-      when: (device_info.partitions | length) == 0
-      block:
-        - name: Set msdos disk extended partition range end
-          set_fact:
-            extended_part_end: "100%"
-          when: device_info.disk.table == "msdos"
+            if [ ! -f "$fs" ]; then
+                # Create a sparse file of the correct size and populate it with an
+                # ext2 filesystem.
+                mkdir -p {{ ocs_data_dir }}
+                truncate -s {{ ocs_disk_size }}G $fs
+                mkfs.ext2 -m 0 "$fs"
 
-        - name: Set non-msdos disk extended partition range end
-          set_fact:
-            extended_part_end: "40%"
-          when: device_info.disk.table != "msdos"
-
-        - name: Create partitions on {{ ocs_device }}
-          shell: |
-            parted {{ ocs_device }} mkpart primary ext2 0% 10%;
-            parted {{ ocs_device }} mkpart primary ext2 10% 20%;
-            parted {{ ocs_device }} mkpart primary ext2 20% 30%;
-            parted {{ ocs_device }} mkpart extended 30% {{ extended_part_end }};
-            parted {{ ocs_device }} mkpart logical ext2 40% 50%;
-            parted {{ ocs_device }} mkpart logical ext2 50% 60%;
-            parted {{ ocs_device }} mkpart logical ext2 60% 70%;
-            parted {{ ocs_device }} mkpart logical ext2 70% 80%;
-            parted {{ ocs_device }} mkpart logical ext2 80% 90%;
-            parted {{ ocs_device }} mkpart logical ext2 90% 100%
-
-    - name: Re-read host {{ ocs_device }} information
-      parted: device={{ ocs_device }} unit=GiB
-      register: device_info
-
-    - debug:
-        var: device_info
+                # Make world readable
+                chown nobody.nobody "$fs"
+                chmod 0777 "$fs"
+            fi
+        done
 
     - name: Attach disks to storage VMs
       command: "{{ item }}"
       register: attach_disks
       failed_when: attach_disks.stderr != "" and "already exists" not in attach_disks.stderr
       with_items:
-        - "virsh attach-disk {{ ocp_cluster_name }}-storage-0 --source {{ ocs_device }}1 --target vdb --persistent"
-        - "virsh attach-disk {{ ocp_cluster_name }}-storage-0 --source {{ ocs_device }}2 --target vdc --persistent"
-        - "virsh attach-disk {{ ocp_cluster_name }}-storage-0 --source {{ ocs_device }}3 --target vdd --persistent"
-        - "virsh attach-disk {{ ocp_cluster_name }}-storage-1 --source {{ ocs_device }}5 --target vdb --persistent"
-        - "virsh attach-disk {{ ocp_cluster_name }}-storage-1 --source {{ ocs_device }}6 --target vdc --persistent"
-        - "virsh attach-disk {{ ocp_cluster_name }}-storage-1 --source {{ ocs_device }}7 --target vdd --persistent"
-        - "virsh attach-disk {{ ocp_cluster_name }}-storage-2 --source {{ ocs_device }}8 --target vdb --persistent"
-        - "virsh attach-disk {{ ocp_cluster_name }}-storage-2 --source {{ ocs_device }}9 --target vdc --persistent"
-        - "virsh attach-disk {{ ocp_cluster_name }}-storage-2 --source {{ ocs_device }}10 --target vdd --persistent"    
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-0 --source {{ ocs_data_dir }}/ocs_disk_1 --target vdb --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-0 --source {{ ocs_data_dir }}/ocs_disk_2 --target vdc --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-0 --source {{ ocs_data_dir }}/ocs_disk_3 --target vdd --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-1 --source {{ ocs_data_dir }}/ocs_disk_4 --target vdb --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-1 --source {{ ocs_data_dir }}/ocs_disk_5 --target vdc --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-1 --source {{ ocs_data_dir }}/ocs_disk_6 --target vdd --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-2 --source {{ ocs_data_dir }}/ocs_disk_7 --target vdb --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-2 --source {{ ocs_data_dir }}/ocs_disk_8 --target vdc --persistent"
+        - "virsh attach-disk {{ ocp_cluster_name }}-storage-2 --source {{ ocs_data_dir }}/ocs_disk_9 --target vdd --persistent" 
 
     - name: Fixes for dev-scripts vbmc container
       block:
@@ -144,6 +123,17 @@
         - 1
         - 2
 
+- hosts: localhost
+  gather_facts: false
+  become: true
+  user: root
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+  tasks:
+  - name: Install OCS
+    when: ocs_enabled == true
+    block:
     - name: Get existing {{ ocp_cluster_name }} worker machineset JSON
       shell: "oc get machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api -o json"
       register: worker_ms_json

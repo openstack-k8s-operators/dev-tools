@@ -45,9 +45,6 @@ ocp_worker_disk: 120
 # OCP cluster name
 ocp_cluster_name: ostest
 
-# Kubeconfig default path
-kubeconfig_path: "{{ base_path }}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-
 # Released version of the opm package from the operator-framework
 opm_version: v1.12.5
 
@@ -96,5 +93,6 @@ default_timeout: 180
 openstackclient_pod_worker: worker-0
 
 # ocs specific
-ocs_enabled: false
-ocs_device: /dev/sdb
+ocs_enabled: true
+ocs_data_dir: /home/ocs/data
+ocs_disk_size: 200

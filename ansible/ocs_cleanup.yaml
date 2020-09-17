@@ -107,7 +107,7 @@
       retries: 100
       delay: 30
       register: storage_nodes_removed
-      until: "'-storage-' not in storage_nodes_removed.stdout"
+      until: "'storage-' not in storage_nodes_removed.stdout"
       environment:
         PATH: "{{ oc_env_path }}"
         KUBECONFIG: "{{ kubeconfig }}"
@@ -159,24 +159,14 @@
         - "{{ ocp_cluster_name }}-storage-1"
         - "{{ ocp_cluster_name }}-storage-2"
 
-    - name: Get list of lingering OCS VGs, if any
+    - name: Remove OCS data disk files
       shell: |
-        vgs --noheadings -o vg_name
-      register: ocs_vgs
+        set -e -o pipefail
 
-    - name: Delete lingering OCS VGs, if any
-      command: vgremove {{ item }} -y
-      with_items: "{{ ocs_vgs.stdout_lines }}"
-      when:
-        - (item | regex_findall('ceph-') | length) > 0
+        for i in {1..9}; do
+            fs="{{ ocs_data_dir }}/ocs_disk_${i}"
 
-    - name: Read host {{ ocs_device }} information
-      parted: device={{ ocs_device }} unit=MiB
-      register: device_info
-
-    - name: Remove partitions on host {{ ocs_device }}
-      parted:
-        device: '{{ ocs_device }}'
-        number: '{{ item.num }}'
-        state: absent
-      loop: '{{ device_info.partitions }}'
+            if [ -f "$fs" ]; then
+                rm -rf "$fs"
+            fi
+        done
