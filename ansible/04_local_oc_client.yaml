@@ -36,7 +36,7 @@
   - name: Copy kubeconfig
     fetch:
       dest: "{{ hostvars['localhost']['kubeconfig'] }}"
-      src: "{{ kubeconfig_path }}"
+      src: "{{ base_path }}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
       flat: true
 
   - name: Copy oc binary

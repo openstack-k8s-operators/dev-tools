@@ -6,4 +6,4 @@
     - block:
         - name: Provision and install OCS storage
           include: ocs.yaml
-      when: ocs_enabled == true and use_kni_ipi_virt == true
+      when: ocs_enabled == true
