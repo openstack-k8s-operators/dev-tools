@@ -110,7 +110,7 @@ nfs_cleanup: hosts
 	 cat \$$temp > /etc/fstab; \
 	 rm \$$temp"
 
-ocp_cleanup: hosts
+destroy_ocp: hosts
 	ANSIBLE_FORCE_COLOR=true ansible -i hosts convergence_base \
 	--become --become-user ocp \
 	-m shell -a "cd /home/ocp/dev-scripts && make clean"
