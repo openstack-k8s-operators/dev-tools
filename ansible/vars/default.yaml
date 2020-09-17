@@ -45,9 +45,6 @@ ocp_worker_disk: 120
 # OCP cluster name
 ocp_cluster_name: ostest
 
-# Kubeconfig default path
-kubeconfig_path: "{{ base_path }}/dev-scripts/ocp/{{ ocp_cluster_name }}/auth/kubeconfig"
-
 # Released version of the opm package from the operator-framework
 opm_version: v1.12.5
 
