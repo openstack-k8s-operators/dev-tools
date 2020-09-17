@@ -8,9 +8,9 @@ spec:
   roleName: worker-osp
   clusterName: ostest
   baseWorkerMachineSetName: ostest-worker-0
-  k8sServiceIP: 172.30.0.1
-  apiIntIP: 192.168.111.5
   workers: 1
+  dedicated: true
+  networkGateway: true
   selinuxDisabled: true
   compute:
     novaComputeCPUDedicatedSet: "4-7"
@@ -19,7 +19,8 @@ spec:
     commonConfigMap: common-config
     ospSecrets: osp-secrets
   network:
-    nic: "enp2s0"
+    nic: "enp6s0"
+    bridgeMappings: "datacentre:br-ex"
     sriov:
       devName: "test"
   drain:
