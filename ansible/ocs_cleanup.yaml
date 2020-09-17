@@ -107,7 +107,7 @@
       retries: 100
       delay: 30
       register: storage_nodes_removed
-      until: "'-storage-' not in storage_nodes_removed.stdout"
+      until: "'storage-' not in storage_nodes_removed.stdout"
       environment:
         PATH: "{{ oc_env_path }}"
         KUBECONFIG: "{{ kubeconfig }}"
