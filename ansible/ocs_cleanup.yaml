@@ -1,14 +1,13 @@
 ---
-- hosts: convergence_base
+- hosts: localhost
   gather_facts: false
   become: true
   user: root
   vars_files: vars/default.yaml
   roles:
   - oc_local
-
   tasks:
-  - name: Remove OCS and de-provision storage nodes
+  - name: Remove OCS
     when: ocs_enabled == true
     block:
     - name: Delete OCS storage cluster object
@@ -128,6 +127,15 @@
         - 1
         - 2
 
+- hosts: convergence_base
+  gather_facts: false
+  become: true
+  user: root
+  vars_files: vars/default.yaml
+  tasks:
+  - name: Remove VMs and vBMCs
+    when: ocs_enabled == true
+    block:
     - name: Stop and delete storage VM vbmcs
       shell: |
         vbmc stop {{ item }};
