@@ -34,7 +34,8 @@ post_install: hosts local-defaults.yaml
 	-i hosts -e @local-defaults.yaml \
 	04_local_oc_client.yaml \
 	05_default_storageclass.yaml \
-	ocp_image_registry.yaml
+	ocp_image_registry.yaml \
+	11_setup_extra_nics_on_vms.yaml
 
 osp_operators_install: compute_node
 compute_node: hosts local-defaults.yaml
