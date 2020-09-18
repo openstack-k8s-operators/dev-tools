@@ -83,7 +83,7 @@
       ignore_errors: true
 
     - set_fact:
-        rabbit_transport_url: "{{ 'rabbit://cell1:passw0rd@rabbitmq.openstack.svc:5672/cell1?ssl=0' | b64encode }}"
+        transport_url: "{{ 'amqp://cell1:passw0rd@amq-interconnect.openstack.svc:5672/cell1' | b64encode }}"
         cinder_password: "{{ 'foobar123' | b64encode }}"
         nova_password: "{{ 'foobar123' | b64encode }}"
         neutron_password: "{{ 'foobar123' | b64encode }}"
