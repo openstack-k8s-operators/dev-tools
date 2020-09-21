@@ -93,6 +93,6 @@ default_timeout: 180
 openstackclient_pod_worker: worker-0
 
 # ocs specific
-ocs_enabled: true
+ocs_enabled: false
 ocs_data_dir: /home/ocs/data
 ocs_disk_size: 200
