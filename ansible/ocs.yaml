@@ -74,6 +74,7 @@
         - "virsh attach-disk {{ ocp_cluster_name }}-storage-2 --source {{ ocs_data_dir }}/ocs_disk_8 --target vdc --persistent"
         - "virsh attach-disk {{ ocp_cluster_name }}-storage-2 --source {{ ocs_data_dir }}/ocs_disk_9 --target vdd --persistent" 
 
+    #
     # This fixes an error that appears *after* dev-scripts has deployed an OCP cluster.
     # It manifests like so:
     #
@@ -85,6 +86,9 @@
     #
     # Removing the container and re-adding it with the following volume mount fixes the problem:
     # -v "/var/run/libvirt:/var/run/libvirt:Z"
+    #
+    # Reported to dev-scripts community here: https://github.com/openshift-metal3/dev-scripts/issues/1115
+    #
     - name: Fixes for dev-scripts vbmc container
       block:
       - name: Stop and remove vbmc container
