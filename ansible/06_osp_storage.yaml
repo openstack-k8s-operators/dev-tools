@@ -1,0 +1,9 @@
+---
+- hosts: localhost
+  gather_facts: false
+  vars_files: vars/default.yaml
+  tasks:
+    - block:
+        - name: Provision and install OCS storage
+          include: ocs.yaml
+      when: ocs_enabled == true
