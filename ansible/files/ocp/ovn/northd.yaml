@@ -17,7 +17,7 @@ spec:
       containers:
       # ovn-northd: convert network objects in nbdb to flows in sbdb
       - name: northd
-        image: "quay.io/mbooth/ovn-central:2.11"
+        image: "quay.io/mbooth/ovn-central:trunk"
         command:
         - /bin/bash
         - -c
@@ -25,14 +25,14 @@ spec:
           set -xe -o pipefail
 
           echo "$(date -Iseconds) - starting ovn-northd"
-          exec ovn-northd \
+          exec /opt/bin/ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
             --ovnnb-db "${NB_CONNECTION}" \
             --ovnsb-db "${SB_CONNECTION}"
         env:
         - name: OVN_LOG_LEVEL
           value: info 
-        - name: OVS_RUNDIR
+        - name: OVN_RUNDIR
           value: /tmp
         - name: NB_CONNECTION
           valueFrom:
