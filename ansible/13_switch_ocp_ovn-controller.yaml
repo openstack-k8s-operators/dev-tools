@@ -1,0 +1,31 @@
+---
+- hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+
+  tasks:
+  - name: scale cluster version operator to 0
+    shell: |
+      oc -n openshift-cluster-version scale deploy cluster-version-operator --replicas=0
+    environment: &oc_env
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+
+  - name: scale network operator to 0
+    shell: |
+      oc -n openshift-network-operator scale deploy network-operator --replicas=0
+    environment:
+      <<: *oc_env
+
+  - name: Modify the ovn-controller image at OCP side
+    shell: |
+      set -e -o pipefail
+
+      oc -n openshift-ovn-kubernetes get ds ovnkube-node -o json | \
+          jq '.spec.template.spec.containers[0].image="quay.io/ltomasbo/ovn-controller:multibridge2"' | \
+          jq '.spec.template.spec.containers[0].volumeMounts[.spec.template.spec.containers[0].volumeMounts | length] |= . + {"mountPath": "/usr/var/run/openvswitch", "name": "run-openvswitch"}' | \
+          jq '.spec.template.spec.containers[1].volumeMounts[.spec.template.spec.containers[1].volumeMounts | length] |= . + {"mountPath": "/usr/var/run/openvswitch", "name": "run-openvswitch"}' | \
+          oc apply -f -
+    environment:
+      <<: *oc_env
