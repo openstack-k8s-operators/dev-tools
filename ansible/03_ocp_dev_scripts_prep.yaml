@@ -73,6 +73,23 @@
           https://cloud.redhat.com/openshift/install/pull-secret and copy it
           there manually.
 
+  - name: Copy ci-token file 
+    when: secrets_repo is undefined
+    block:
+    - set_fact:
+        secrets_repo_path: "{{ base_path }}"
+    - name: Copy ci-token
+      copy:
+        dest: "{{ base_path }}/ci-token"
+        src: files/ci-token
+    rescue:
+    - fail:
+        msg: |
+          files/ci-token is not present. You must obtain it from
+          https://api.ci.openshift.org (by clicking the upper right 
+          drop-down and selecting "Copy Login Command") and copy it
+          there manually.
+
   - name: use secrets_repo
     when: secrets_repo is defined
     block:
@@ -89,11 +106,17 @@
         dest: "{{ secrets_repo_path }}"
         version: "{{ secrets_branch | default('HEAD', true) }}"
 
-  - name: set PULL_SECRET in {{ base_path }}/dev-scripts/config_$USER.sh
+  - name: set PULL_SECRET_FILE in {{ base_path }}/dev-scripts/config_$USER.sh
     lineinfile:
       path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export PULL_SECRET='
-      line: export PULL_SECRET=$(cat "{{ secrets_repo_path }}/pull-secret")
+      regexp: '^export PULL_SECRET_FILE='
+      line: export PULL_SECRET_FILE="{{ secrets_repo_path }}/pull-secret"
+    
+  - name: set CI_TOKEN in {{ base_path }}/dev-scripts/config_$USER.sh
+    lineinfile:
+      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
+      regexp: '^export CI_TOKEN='
+      line: export CI_TOKEN=$(cat "{{ secrets_repo_path }}/ci-token")
 
   - name: set IP_STACK in {{ base_path }}/dev-scripts/config_$USER.sh
     lineinfile:
