@@ -106,12 +106,6 @@
         dest: "{{ secrets_repo_path }}"
         version: "{{ secrets_branch | default('HEAD', true) }}"
 
-  - name: set PULL_SECRET_FILE in {{ base_path }}/dev-scripts/config_$USER.sh
-    lineinfile:
-      path: "{{ base_path }}/dev-scripts/config_$USER.sh"
-      regexp: '^export PULL_SECRET_FILE='
-      line: export PULL_SECRET_FILE="{{ secrets_repo_path }}/pull-secret"
-
   - name: set PERSONAL_PULL_SECRET in {{ base_path }}/dev-scripts/config_$USER.sh
     lineinfile:
       path: "{{ base_path }}/dev-scripts/config_$USER.sh"
