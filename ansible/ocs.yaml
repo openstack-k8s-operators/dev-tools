@@ -55,14 +55,6 @@
       - name: Set {{ ocs_worker_domain }} VM max cpus
         command: "virsh setvcpus {{ ocs_worker_domain }} {{ ocp_storage_vcpu }} --config --maximum"
 
-      - name: Restart {{ ocs_worker_domain }} VM
-        virt: 
-          name: "{{ ocs_worker_domain }}"
-          state: running
-
-      - name: Set {{ ocs_worker_domain }} VM live cpus
-        command: "virsh setvcpus {{ ocs_worker_domain }} {{ ocp_storage_vcpu }} --live"
-
 - hosts: localhost
   gather_facts: false
   become: true
@@ -74,6 +66,46 @@
   - name: Install OCS
     when: ocs_enabled == true
     block:
+    - name: Annotate associated machine for {{ ocs_worker_node }} for deletion
+      shell: "oc annotate machine/$(oc get bmh/{{ ocp_cluster_name}}-{{ ocs_worker_node }} -n openshift-machine-api --no-headers -o custom-columns=blah:.spec.consumerRef.name) machine.openshift.io/cluster-api-delete-machine=yes -n openshift-machine-api"
+      register: annotate_ocs_node
+      failed_when: annotate_ocs_node.stderr != "" and "not found" not in annotate_ocs_node.stderr
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Scale worker machineset down by 1
+      shell: "oc scale machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --replicas=$(($(oc get machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --no-headers -o custom-columns=blah:.status.replicas) - 1))"
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait for {{ ocs_worker_node }} to be de-provisioned
+      shell: oc get nodes -l node-role.kubernetes.io/worker
+      retries: 100
+      delay: 15
+      register: storage_node_removed
+      until: ocs_worker_node not in storage_node_removed.stdout
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Scale worker machineset up by 1
+      shell: "oc scale machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --replicas=$(($(oc get machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --no-headers -o custom-columns=blah:.status.replicas) + 1))"
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait for {{ ocs_worker_node }} to be provisioned
+      shell: oc get nodes -l node-role.kubernetes.io/worker
+      retries: 100
+      delay: 15
+      register: storage_node_ready
+      until: "(storage_node_ready.stdout | regex_findall(ocs_worker_node + '   Ready') | length) == 1"
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+        
     - name: Create OCS YAMLs working dir
       file:
         path: "{{ working_yamls_dir }}/ocs"
@@ -120,6 +152,16 @@
     - name: Create local-storage PVs
       shell: |
         oc apply -f {{ working_yamls_dir }}/ocs/local-storage-volumes.yaml
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait for local-storage PVs to be ready
+      shell: oc get pv -n local-storage
+      retries: 100
+      delay: 15
+      register: local_storage_volumes_ready
+      until: (local_storage_volumes_ready.stdout | regex_findall('local-pv-.+Available') | length) == (local_storage_volumes_ready.stdout | regex_findall('local-pv-.+') | length) and (local_storage_volumes_ready.stdout | regex_findall('local-pv-.+Available') | length) != 0
       environment:
         PATH: "{{ oc_env_path }}"
         KUBECONFIG: "{{ kubeconfig }}"
