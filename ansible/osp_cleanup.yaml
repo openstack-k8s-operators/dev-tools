@@ -55,11 +55,6 @@
           tags:
           - wait
 
-        - name: remove machine finalizers from {{ worker_osp_machine.stdout }}
-          shell: |
-            oc patch -n openshift-machine-api machines  -p '{"metadata":{"finalizers":[]}}' --type merge {{ worker_osp_machine.stdout }}
-          when: worker_osp_machine.stdout != ""
-
         - name: delete worker-osp node {{ worker_osp_node.stdout }}
           shell: |
             oc delete --ignore-not-found node {{ worker_osp_node.stdout }}
@@ -68,17 +63,6 @@
         - name: delete osp machineset
           shell: >
             oc delete --ignore-not-found -n openshift-machine-api machineset ostest-worker-osp
-
-        - name: remove finalizers from blocker pod {{ worker_osp_node.stdout }}-blocker-pod
-          shell: |
-            oc patch -n openstack pod {{worker_osp_node.stdout }}-blocker-pod  -p '{"metadata":{"finalizers":[]}}' --type merge
-          when: worker_osp_node.stdout != ""
-
-        - name: remove consumerRef baremetalhost {{ worker_osp_bmh.stdout }}
-          shell: |
-            oc patch -n openshift-machine-api bmh/{{ worker_osp_bmh.stdout }} -p '[{"op": "remove", "path": "/spec/consumerRef"}]' --type json
-          when: worker_osp_bmh is defined and worker_osp_bmh.stdout != ""
-          ignore_errors: true
 
         - name: delete openstack.org CRD's
           shell: >
