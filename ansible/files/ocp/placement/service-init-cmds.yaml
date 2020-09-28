@@ -11,4 +11,4 @@ data:
     service create --name placement --description "Openstack Placement" placement
     endpoint create --region regionOne placement public http://placement-openstack.apps.ostest.test.metalkube.org/
     endpoint create --region regionOne placement admin http://placement-openstack.apps.ostest.test.metalkube.org/
-    endpoint create --region regionOne placement internal http://placement-openstack.openstack.svc:8778/
+    endpoint create --region regionOne placement internal http://placement.openstack.svc:8778/
