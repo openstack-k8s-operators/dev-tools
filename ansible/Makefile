@@ -78,7 +78,6 @@ ctlplane-yamls: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
 	install_rabbitmq.yaml \
-	install_osconfig.yaml \
 	install_glance_service_init.yaml \
 	install_placement.yaml \
 	install_ovn.yaml \

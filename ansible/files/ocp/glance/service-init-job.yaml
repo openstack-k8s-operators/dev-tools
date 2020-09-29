@@ -23,22 +23,34 @@ spec:
             - name: OS_CLOUD
               valueFrom:
                 configMapKeyRef:
-                  name: osconfig
+                  name: openstack-config
                   key: OS_CLOUD
           volumeMounts:
-            - mountPath: /etc/openstack
+            - mountPath: /etc/openstack/clouds.yaml
+              subPath: clouds.yaml
               readOnly: true
-              name: osconfig
+              name: openstack-config
+            - mountPath: /etc/openstack/secure.yaml
+              subPath: secure.yaml
+              readOnly: true
+              name: openstack-config-secret
             - mountPath: /openstackclient
               readOnly: true
               name: openstackclient-cmds
       volumes:
-        - name: osconfig
+        - name: openstack-config
           configMap:
-            name: osconfig
+            name: openstack-config
             items:
               - key: clouds.yaml
                 path: clouds.yaml
+                mode: 0444
+        - name: openstack-config-secret
+          secret:
+            secretName: openstack-config-secret
+            items:
+              - key: secure.yaml
+                path: secure.yaml
                 mode: 0444
         - name: openstackclient-cmds
           configMap:
