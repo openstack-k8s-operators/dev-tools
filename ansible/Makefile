@@ -82,8 +82,7 @@ ctlplane-yamls: hosts local-defaults.yaml
 	install_placement.yaml \
 	install_ovn.yaml \
 	install_neutron-api.yaml \
-	install_nova-api.yaml \
-	install_nova-cell.yaml
+	install_nova.yaml
 
 podified-ctlplane: ctlplane
 ctlplane: hosts local-defaults.yaml ctlplane-operator ctlplane-yamls
