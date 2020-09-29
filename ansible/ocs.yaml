@@ -188,6 +188,12 @@
         PATH: "{{ oc_env_path }}"
         KUBECONFIG: "{{ kubeconfig }}"
 
+    # FIXME: We currently check for the pods enumerated in the "until" clause below due to the behavior of the 
+    #        StorageCluster resource's "phase" output.  Unfortunately the phase is reported as "Ready" as soon
+    #        as the StorageCluster resource appears, which is not actually true, as the various OCS pods required
+    #        for the proper functioning of the underlying Ceph cluster have not yet been created.  The phase 
+    #        eventually transitions to "Progressing" and then to "Ready" again at a later time.  Thus, we can't
+    #        rely on this state and have to check for the individual pods for now.
     - name: Wait for OCS pods to be ready
       shell: oc get pods -n openshift-storage
       retries: 100
