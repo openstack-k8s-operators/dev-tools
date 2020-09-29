@@ -33,7 +33,7 @@ spec:
 
       # nbdb: the northbound, or logical network object DB. In raft mode
       - name: nbdb
-        image: &image "quay.io/mbooth/ovn-central:2.11"
+        image: &image "quay.io/mbooth/ovn-central:trunk"
         command:
         - /bin/bash
         - -c
@@ -42,7 +42,7 @@ spec:
 
           # See the comment on the override-local-service-ip to see what this
           # is about
-          node_svc_name="$(hostname).openstack.svc.cluster.local"
+          export SERVER_NAME="$(hostname).openstack.svc.cluster.local"
 
           # The StatefulSet ensures that the first node to come up will be node
           # zero. Below we configure node zero to initialise a new cluster
@@ -54,62 +54,25 @@ spec:
 
           echo "$(date -Iseconds) - starting nbdb"
           if [[ "$(hostname)" == "${initialiser}" ]]; then
-            # XXX: Add SSL. service-ca generated certs don't seem to work here.
-            #--ovn-nb-db-ssl-key=
-            #--ovn-nb-db-ssl-cert=
-            #--ovn-nb-db-ssl-ca-cert=
-            #--db-nb-cluster-local-proto=ssl
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
-            --no-monitor \
-            --db-nb-create-insecure-remote=yes \
-            --db-nb-cluster-local-addr="${node_svc_name}" \
-            --db-nb-cluster-local-proto=tcp \
-            --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
-            run_nb_ovsdb
+            /cluster-create
           else
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
-            --no-monitor \
-            --db-nb-create-insecure-remote=yes \
-            --db-nb-cluster-remote-addr="${initialiser}.openstack.svc.cluster.local" \
-            --db-nb-cluster-remote-proto=tcp \
-            --db-nb-cluster-local-addr="${node_svc_name}" \
-            --db-nb-cluster-local-proto=tcp \
-            --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
-            run_nb_ovsdb
+            /cluster-join any "tcp:${initialiser}.openstack.svc.cluster.local:6643"
           fi
-        readinessProbe:
-          exec:
-            command:
-            - /bin/bash
-            - -c
-            - |
-              set -xe
-              ovsdb-client wait unix:${OVS_RUNDIR}/ovnnb_db.sock OVN_Northbound connected
-        livenessProbe:
-          # Try to grab the uuid of the config record by connecting externally
-          # to the service IP
-          exec:
-            command:
-            - /bin/bash
-            - -c
-            - |
-              set -xe
-              ovsdb-client dump tcp:$(hostname).ovn-ovsdb.openstack.svc.cluster.local:6641 \
-                                OVN_Northbound NB_Global _uuid
-        env: &pod_env
-        - name: OVS_RUNDIR
-          value: /pod-run
-        - name: OVS_DBDIR
+          exec /dbserver
+        env:
+        - name: DB_TYPE
+          value: NB
+        - name: OVN_RUNDIR
+          value: /ovn-run
+        - name: OVN_DBDIR
           value: /var/lib/openvswitch
         - name: OVN_LOG_LEVEL
           value: info
         volumeMounts: &pod_mounts
         - mountPath: /var/lib/openvswitch/
           name: data
-        - mountPath: /pod-run
-          name: pod-run
-        - mountPath: /var/log/openvswitch/
-          name: logs
+        - mountPath: /ovn-run
+          name: ovn-run
         - mountPath: /etc/hosts
           name: hosts
           subPath: hosts
@@ -135,7 +98,7 @@ spec:
 
           # See the comment on the override-local-service-ip to see what this
           # is about
-          node_svc_name="$(hostname).openstack.svc.cluster.local"
+          export SERVER_NAME="$(hostname).openstack.svc.cluster.local"
 
           # The StatefulSet ensures that the first node to come up will be node
           # zero. Below we configure node zero to initialise a new cluster
@@ -147,82 +110,29 @@ spec:
 
           echo "$(date -Iseconds) - starting nbdb"
           if [[ "$(hostname)" == "${initialiser}" ]]; then
-            # XXX: Add SSL. service-ca generated certs don't seem to work here.
-            #--ovn-sb-db-ssl-key=
-            #--ovn-sb-db-ssl-cert=
-            #--ovn-sb-db-ssl-ca-cert=
-            #--db-sb-cluster-local-proto=ssl
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
-            --no-monitor \
-            --db-sb-create-insecure-remote=yes \
-            --db-sb-cluster-local-addr="${node_svc_name}" \
-            --db-sb-cluster-local-proto=tcp \
-            --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
-            run_sb_ovsdb
+            /cluster-create
           else
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
-            --no-monitor \
-            --db-sb-create-insecure-remote=yes \
-            --db-sb-cluster-remote-addr="${initialiser}.openstack.svc.cluster.local" \
-            --db-sb-cluster-remote-proto=tcp \
-            --db-sb-cluster-local-addr="${node_svc_name}" \
-            --db-sb-cluster-local-proto=tcp \
-            --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
-            run_sb_ovsdb
+            /cluster-join any "tcp:${initialiser}.openstack.svc.cluster.local:6644"
           fi
-        readinessProbe:
-          exec:
-            command:
-            - /bin/bash
-            - -c
-            - |
-              set -xe
-              ovsdb-client wait unix:${OVS_RUNDIR}/ovnsb_db.sock OVN_Southbound connected
-        livenessProbe:
-          # Try to grab the uuid of the config record by connecting externally
-          # to the service IP
-          exec:
-            command:
-            - /bin/bash
-            - -c
-            - |
-              set -xe
-              ovsdb-client dump tcp:$(hostname).ovn-ovsdb.openstack.svc.cluster.local:6642 \
-                                OVN_Southbound SB_Global _uuid
-        env: *pod_env
+          exec /dbserver
+        env:
+        - name: DB_TYPE
+          value: SB
+        - name: OVN_RUNDIR
+          value: /ovn-run
+        - name: OVN_DBDIR
+          value: /var/lib/openvswitch
+        - name: OVN_LOG_LEVEL
+          value: info
         volumeMounts: *pod_mounts
         ports:
         - name: sb-db-port
           containerPort: 6642
-          # XXX: We need to expose the sb db to compute workers, which don't
-          # have access to K8S cluster service. By using hostPort here, compute
-          # workers can acccess the sb db by lookup up host the pod is running
-          # on and accessing it there. This also requires additional privilege.
-          # Delete this when we have RHBZ#1836209
-          hostPort: 16642
         - name: sb-db-raft-port
           containerPort: 6644
         terminationMessagePolicy: FallbackToLogsOnError
 
       initContainers:
-      # This is a hack because ovsdb-server attempts to open a log file despite
-      # it being apparently disabled, and fails if it can't. We should address
-      # this with the ovs team and get rid of it.
-      - name: create-log-files
-        image: *image
-        securityContext:
-          runAsUser: 0
-        command:
-        - /bin/bash
-        - -c
-        - |
-          touch /var/log/openvswitch/ovsdb-server-{n,s}b.log
-          chmod 777 /var/log/openvswitch/ovsdb-server-{n,s}b.log
-        volumeMounts:
-        - mountPath: /var/log/openvswitch/
-          name: logs
-
-
       # ovsdb adds 'cluster-local-addr' to the shared cluster table, and also
       # binds to it locally. Therefore it must be possible for the local pod to
       # bind to this name, and for other pods to route to it.
@@ -252,6 +162,7 @@ spec:
         image: *image
         securityContext:
           runAsUser: 0
+        imagePullPolicy: Always
         env:
         - name: POD_IP
           valueFrom:
@@ -270,9 +181,7 @@ spec:
           name: hosts
 
       volumes:
-      - name: pod-run
-        emptyDir: {}
-      - name: logs
+      - name: ovn-run
         emptyDir: {}
       - name: hosts
         emptyDir: {}
