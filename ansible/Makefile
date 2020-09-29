@@ -34,7 +34,9 @@ post_install: hosts local-defaults.yaml
 	-i hosts -e @local-defaults.yaml \
 	04_local_oc_client.yaml \
 	05_default_storageclass.yaml \
-	ocp_image_registry.yaml
+	ocp_image_registry.yaml \
+	11_setup_extra_nics_on_vms.yaml \
+	13_switch_ocp_ovn-controller.yaml
 
 osp_operators_install: compute_node
 compute_node: hosts local-defaults.yaml
@@ -42,6 +44,12 @@ compute_node: hosts local-defaults.yaml
 	-i hosts -e @local-defaults.yaml \
         09_create_common-config.yaml \
 	12_setup_worker_osp_machineset.yaml \
+
+ocp_ovn_controller: hosts local-defaults.yaml
+	ANSIBLE_FORCE_COLOR=true ansible-playbook \
+	-i hosts -e @local-defaults.yaml \
+	13_switch_ocp_ovn-controller.yaml
+
 
 compute_common_config: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
@@ -110,7 +118,7 @@ nfs_cleanup: hosts
 	 cat \$$temp > /etc/fstab; \
 	 rm \$$temp"
 
-ocp_cleanup: hosts
+destroy_ocp: hosts
 	ANSIBLE_FORCE_COLOR=true ansible -i hosts convergence_base \
 	--become --become-user ocp \
 	-m shell -a "cd /home/ocp/dev-scripts && make clean"
