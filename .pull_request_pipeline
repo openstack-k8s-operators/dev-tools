@@ -1,17 +1,16 @@
 pipeline {
     agent none
     stages {
-        stage('Run PR jobs') {
-            parallel {
-                stage('DFG-converged-openstack-k8s') {
-                    steps {
-                        build job: 'DFG-converged-openstack-k8s',
-                                  parameters: [
-                                      string(name: 'GITHUB_PULL_REQUEST_ID', value: String.valueOf(CHANGE_ID))
-                                  ]
-                    }
-                }
+        stage('Run after pull request is merged') {
+        when {
+            allOf {
+                environment name: 'CHANGE_ID', value: ''
+                branch 'master'
             }
+        }
+        steps {
+            build job: 'DFG-converged-openstack-k8s-dev-tools-merge'
+        }
         }
     }
 }
