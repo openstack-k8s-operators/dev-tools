@@ -29,6 +29,8 @@ ocp_num_workers: 5
 ocp_master_memory: 16384
 ocp_master_vcpu: 8
 ocp_master_disk: 120
+ocp_storage_memory: 16384
+ocp_storage_vcpu: 8
 ocp_worker_memory: 8192
 ocp_worker_vcpu: 4
 ocp_worker_disk: 120
@@ -89,3 +91,15 @@ default_timeout: 180
 # worker node where openstackclient pod will run
 openstackclient_pod_worker: worker-0
 
+# ocs specific
+ocs_enabled: false
+ocs_worker_index: 1 # index of worker node where OCS cluster will be installed
+ocs_worker_domain: "{{ ocp_cluster_name }}_worker_{{ ocs_worker_index }}"
+ocs_worker_node: "worker-{{ ocs_worker_index }}"
+ocs_data_dir: /home/ocs/data
+ocs_disks:
+  - vda
+  #- vdb # uncomment for extra disks if desired
+  #- vdc
+ocs_disk_size: 200
+ocs_full_cleanup: true # re-provisions the ocs_worker_node during clean-up to ensure a complete Ceph removal

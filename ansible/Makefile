@@ -93,6 +93,11 @@ olm: hosts local-defaults.yaml
 	install_namespace.yaml \
 	olm.yaml
 
+ocs: hosts local-defaults.yaml
+	ANSIBLE_FORCE_COLOR=true ansible-playbook \
+	-v -i hosts -e @local-defaults.yaml \
+	ocs.yaml
+
 openstackclient: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-v -i hosts -e @local-defaults.yaml \
@@ -131,3 +136,8 @@ osp_cleanup: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-v -i hosts -e @local-defaults.yaml \
 	osp_cleanup.yaml
+
+ocs_cleanup: hosts local-defaults.yaml
+	ANSIBLE_FORCE_COLOR=true ansible-playbook \
+	-v -i hosts -e @local-defaults.yaml \
+	ocs_cleanup.yaml

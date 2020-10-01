@@ -1,0 +1,215 @@
+---
+- hosts: localhost
+  gather_facts: false
+  become: true
+  user: root
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+  tasks:
+  - name: Remove OCS
+    when: ocs_enabled == true
+    block:
+    - name: Delete OCS storage cluster object
+      shell: oc delete --ignore-not-found -f {{ working_yamls_dir }}/ocs/ocs-storage-cluster.yaml
+      register: remove_ocs_storage_cluster
+      failed_when: remove_ocs_storage_cluster.stderr != "" and ("not found" not in remove_ocs_storage_cluster.stderr and "no matches for kind" not in remove_ocs_storage_cluster.stderr)
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Make sure OCS ceph-cluster deployments are deleted
+      shell: |
+        for i in $(oc get deployment -n openshift-storage -l app=rook-ceph-osd --no-headers -o name); do
+          oc delete $i -n openshift-storage
+        done
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait until rook-ceph-mon, rook-ceph-osd and non-operator-noobaa pods are removed
+      shell: oc get pods -n openshift-storage
+      retries: 100
+      delay: 15
+      register: ocs_pods_removed
+      until: (ocs_pods_removed.stdout | regex_findall('rook-ceph-mon-') | length) == 0 and (ocs_pods_removed.stdout | regex_findall('rook-ceph-osd-') | length) == 0
+             and (ocs_pods_removed.stdout | regex_findall('noobaa-') | length) <= 1
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Make sure cephobjectstoreuser resources will be successfully removed
+      shell: |
+        for i in $(oc get cephobjectstoreusers --no-headers -o name -n openshift-storage); do 
+          oc patch $i --type='json' -p='[{"op": "replace", "path": "/metadata/finalizers", "value":[]}]' -n openshift-storage; 
+        done
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+    
+    - name: Delete OCS subscription
+      shell: oc delete --ignore-not-found -f {{ working_yamls_dir }}/ocs/ocs-sub.yaml
+      register: remove_ocs_sub
+      failed_when: remove_ocs_sub.stderr != "" and ("not found" not in remove_ocs_sub.stderr and "no matches for kind" not in remove_ocs_sub.stderr)
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait until openshift-storage namespace is removed
+      shell: oc get namespace
+      retries: 100
+      delay: 15
+      register: ocs_namespace_removed
+      until: (ocs_namespace_removed.stdout | regex_findall('openshift-storage') | length) == 0
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Delete local-storage localvolume objects
+      shell: oc delete --ignore-not-found -f {{ working_yamls_dir }}/ocs/local-storage-volumes.yaml
+      register: remove_local_storage_volumes
+      failed_when: remove_local_storage_volumes.stderr != "" and ("not found" not in remove_local_storage_volumes.stderr and "no matches for kind" not in remove_local_storage_volumes.stderr)
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Delete local-storage pvs
+      shell: |
+        for i in $(oc get pv -n local-storage -l storage.openshift.com/local-volume-owner-name=local-disks --no-headers -o name); do
+          oc delete $i
+        done
+      register: remove_local_storage_pvs
+      failed_when: remove_local_storage_pvs.stderr != "" and "not found" not in remove_local_storage_pvs.stderr
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"      
+
+    - name: Delete local-storage subscription
+      shell: oc delete --ignore-not-found -f {{ working_yamls_dir }}/ocs/local-storage-sub.yaml
+      register: remove_local_storage_sub
+      failed_when: remove_local_storage_sub.stderr != "" and ("not found" not in remove_local_storage_sub.stderr and "no matches for kind" not in remove_local_storage_sub.stderr)
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait until local-storage namespace is removed
+      shell: oc get namespace
+      retries: 100
+      delay: 15
+      register: local_storage_namespace_removed
+      until: (local_storage_namespace_removed.stdout | regex_findall('local-storage') | length) == 0
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Remove OCS-capable labels from {{ ocs_worker_node }}
+      shell: |
+          oc label node/{{ ocs_worker_node }} cluster.ocs.openshift.io/openshift-storage-;
+          oc label node/{{ ocs_worker_node }} topology.rook.io/rack-
+      register: remove_ocs_labels
+      failed_when: remove_ocs_labels.stderr != "" and "not found" not in remove_ocs_labels.stderr
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+
+- hosts: convergence_base
+  gather_facts: false
+  become: true
+  user: root
+  vars_files: vars/default.yaml
+  tasks:
+  - name: Remove data disks and reset {{ ocs_worker_domain }} specs
+    when: ocs_enabled == true
+    block:
+    - name: Destroy {{ ocs_worker_domain }} VM
+      virt:
+        name: "{{ ocs_worker_domain }}"
+        state: destroyed
+
+    - name: Remove data disks from {{ ocs_worker_domain }}
+      command: "virsh detach-disk {{ ocs_worker_domain }} --target {{ item }} --persistent --config"
+      register: detach_disks
+      failed_when: detach_disks.stderr != "" and ("No disk found whose source path or target" not in detach_disks.stderr and "not found" not in detach_disks.stderr)
+      with_items: "{{ ocs_disks }}"
+
+    - name: Reset {{ ocs_worker_domain }} VM cpu and memory specs
+      block:
+      - name: Set {{ ocs_worker_domain }} VM memory
+        shell: |
+          virsh setmaxmem {{ ocs_worker_domain }} {{ ocp_worker_memory }}M --config;
+          virsh setmem {{ ocs_worker_domain }} {{ ocp_worker_memory }}M --config
+
+      - name: Set {{ ocs_worker_domain }} VM maximum cpus
+        command: "virsh setvcpus {{ ocs_worker_domain }} {{ ocp_worker_vcpu }} --config --maximum"
+
+      - name: Restart {{ ocs_worker_domain }} VM
+        virt:
+          name: "{{ ocs_worker_domain }}"
+          state: running
+
+      - name: Set {{ ocs_worker_domain }} VM live cpus
+        command: "virsh setvcpus {{ ocs_worker_domain }} {{ ocp_worker_vcpu }} --live"
+
+    - name: Remove OCS data disk files
+      shell: |
+        set -e -o pipefail
+
+        for i in {1..{{ ocs_disks | length}}}; do
+            fs="{{ ocs_data_dir }}/ocs_disk_${i}"
+
+            if [ -f "$fs" ]; then
+                rm -rf "$fs"
+            fi
+        done
+
+- hosts: localhost
+  gather_facts: false
+  become: true
+  user: root
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+  tasks:
+  - name: Reprovision {{ ocs_worker_node }} when requested
+    when: ocs_enabled == true and ocs_full_cleanup == true
+    block:
+    - name: Annotate associated machine for {{ ocs_worker_node }} for deletion
+      shell: "oc annotate machine/$(oc get bmh/{{ ocp_cluster_name}}-{{ ocs_worker_node }} -n openshift-machine-api --no-headers -o custom-columns=blah:.spec.consumerRef.name) machine.openshift.io/cluster-api-delete-machine=yes -n openshift-machine-api"
+      register: annotate_ocs_node
+      failed_when: annotate_ocs_node.stderr != "" and "not found" not in annotate_ocs_node.stderr
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Scale worker machineset down by 1
+      shell: "oc scale machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --replicas=$(($(oc get machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --no-headers -o custom-columns=blah:.status.replicas) - 1))"
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait for {{ ocs_worker_node }} to be de-provisioned
+      shell: oc get nodes -l node-role.kubernetes.io/worker
+      retries: 100
+      delay: 15
+      register: storage_node_removed
+      until: ocs_worker_node not in storage_node_removed.stdout
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Scale worker machineset up by 1
+      shell: "oc scale machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --replicas=$(($(oc get machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --no-headers -o custom-columns=blah:.status.replicas) + 1))"
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait for {{ ocs_worker_node }} to be provisioned
+      shell: oc get nodes -l node-role.kubernetes.io/worker
+      retries: 100
+      delay: 15
+      register: storage_node_ready
+      until: "(storage_node_ready.stdout | regex_findall(ocs_worker_node + '   Ready') | length) == 1"
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
