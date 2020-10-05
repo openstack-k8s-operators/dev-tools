@@ -28,7 +28,8 @@
       set -e
       oc apply -n openstack -f "{{ ctlplane_yaml_dir }}"
     environment: &oc_env
-      <<: *oc_env
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
 
   - name: Wait for mariadb pod creation
     shell: |
