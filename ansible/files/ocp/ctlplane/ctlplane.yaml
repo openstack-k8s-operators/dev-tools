@@ -8,4 +8,12 @@ spec:
     replicas: 1
   keystone:
     replicas: 1
+  placement:
+    replicas: 1
+  nova:
+    novaAPIReplicas: 1
+    novaSchedulerReplicas: 1
+    novaConductorReplicas: 1
+    novaMetadataReplicas: 1
+    novaNoVNCProxyReplicas: 1
   storage_class: host-nfs-storageclass

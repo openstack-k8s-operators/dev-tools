@@ -1,0 +1,36 @@
+---
+- hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+
+  tasks:
+  - set_fact:
+      placement_yaml_dir: "{{ working_yamls_dir }}/placement"
+
+  - debug:
+      msg: "yamls will be written to {{ placement_yaml_dir }} locally"
+
+  - name: Create yaml dir
+    file:
+      path: "{{ placement_yaml_dir }}"
+      state: directory
+
+  - name: Copy files to yaml dir
+    copy:
+      src: "{{ item }}"
+      dest: "{{ placement_yaml_dir }}/"
+    with_items:
+    - "ocp/placement/service-init-cmds.yaml"
+    - "ocp/placement/service-init-job.yaml"
+
+  - name: Start placement
+    shell: |
+      set -e
+      oc apply -n openstack -f "{{ placement_yaml_dir ~ '/' ~ item }}"
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+    with_items:
+    - "service-init-cmds.yaml"
+    - "service-init-job.yaml"
