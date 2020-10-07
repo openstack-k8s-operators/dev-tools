@@ -78,10 +78,10 @@ ctlplane-yamls: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
 	install_glance_service_init.yaml \
-	install_placement.yaml \
+	install_placement_service_init.yaml \
+	install_nova_service_init.yaml \
 	install_ovn.yaml \
-	install_neutron-api.yaml \
-	install_nova.yaml
+	install_neutron-api.yaml
 
 podified-ctlplane: ctlplane
 ctlplane: hosts local-defaults.yaml ctlplane-operator ctlplane-yamls

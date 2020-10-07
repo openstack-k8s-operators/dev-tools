@@ -1,0 +1,36 @@
+---
+- hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+
+  tasks:
+  - set_fact:
+      nova_yaml_dir: "{{ working_yamls_dir }}/nova"
+
+  - debug:
+      msg: "yamls will be written to {{ nova_yaml_dir }} locally"
+
+  - name: Create yaml dir
+    file:
+      path: "{{ nova_yaml_dir }}"
+      state: directory
+
+  - name: Copy files to yaml dir
+    copy:
+      src: "{{ item }}"
+      dest: "{{ nova_yaml_dir }}/"
+    with_items:
+    - "ocp/nova/service-init-cmds.yaml"
+    - "ocp/nova/service-init-job.yaml"
+
+  - name: Start Nova
+    shell: |
+      set -e
+      oc apply -n openstack -f "{{ nova_yaml_dir ~ '/' ~ item }}"
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+    with_items:
+    - "service-init-cmds.yaml"
+    - "service-init-job.yaml"
