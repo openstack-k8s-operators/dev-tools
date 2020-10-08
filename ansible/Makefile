@@ -35,15 +35,14 @@ post_install: hosts local-defaults.yaml
 	04_local_oc_client.yaml \
 	05_default_storageclass.yaml \
 	ocp_image_registry.yaml \
-	11_setup_extra_nics_on_vms.yaml \
-	13_switch_ocp_ovn-controller.yaml
+	11_setup_extra_nics_on_vms.yaml
 
 osp_operators_install: compute_node
 compute_node: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
         09_create_common-config.yaml \
-	12_setup_worker_osp_machineset.yaml \
+	12_setup_worker_osp_machineset.yaml
 
 ocp_ovn_controller: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
@@ -59,6 +58,7 @@ compute_common_config: hosts local-defaults.yaml
 osp_content: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
+	13_switch_ocp_ovn-controller.yaml \
         osp_content.yaml
 
 osp_tests_run: hosts local-defaults.yaml
