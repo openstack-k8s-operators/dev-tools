@@ -60,6 +60,7 @@
       MARIADB_IMAGE: "{{mariadb_operator_image}}"
       GLANCE_IMAGE: "{{glance_operator_image}}"
       PLACEMENT_IMAGE: "{{placement_operator_image}}"
+      OVN_IMAGE: "{{ovn_operator_image}}"
       NAMESPACE: openstack
 
   - name: switch to openstack project/namespace
