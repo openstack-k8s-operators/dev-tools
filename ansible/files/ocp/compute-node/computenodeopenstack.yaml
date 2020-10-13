@@ -16,8 +16,6 @@ spec:
     novaComputeCPUDedicatedSet: "4-7"
     novaComputeCPUSharedSet: "0-3"
     sshdPort: 2022
-    commonConfigMap: common-config
-    ospSecrets: osp-secrets
   network:
     nic: "enp6s0"
     bridgeMappings: "datacentre:br-ex"
@@ -26,6 +24,6 @@ spec:
   drain:
     drainPodImage: quay.io/openstack-k8s-operators/tripleo-deploy
     enabled: false
-  openStackClientAdminSecret: openstackclient-admin
-  openStackClientConfigMap: openstackclient
+  openStackClientAdminSecret: openstack-config-secret
+  openStackClientConfigMap: openstack-config
   serviceAccount: compute-node
