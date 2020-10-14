@@ -1,8 +1,6 @@
 ---
 - hosts: localhost
   gather_facts: false
-  become: true
-  user: root
   vars_files: vars/default.yaml
   roles:
   - oc_local
