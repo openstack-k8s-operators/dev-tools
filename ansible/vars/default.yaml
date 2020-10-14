@@ -64,6 +64,7 @@ mariadb_operator_image: quay.io/openstack-k8s-operators/mariadb-operator:v0.0.4
 glance_operator_image: quay.io/openstack-k8s-operators/glance-operator:v0.0.3
 placement_operator_image: quay.io/openstack-k8s-operators/placement-operator:v0.0.1
 ovn_operator_image: quay.io/openstack-k8s-operators/ovn-operator:v0.0.1
+cinder_operator_image: quay.io/openstack-k8s-operators/cinder-operator:v0.0.1
 
 # olm specific
 csv_version: 0.0.1

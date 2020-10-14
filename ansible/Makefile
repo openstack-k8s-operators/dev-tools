@@ -78,6 +78,7 @@ ctlplane-yamls: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
 	install_placement_service_init.yaml \
+	install_cinder_service_config.yaml \
 	install_ovn.yaml \
 	install_neutron-api.yaml
 

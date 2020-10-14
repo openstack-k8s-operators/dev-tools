@@ -1,0 +1,81 @@
+---
+- hosts: convergence_base
+  gather_facts: false
+  become: true
+  user: root
+  vars_files: vars/default.yaml
+
+  tasks:
+  - set_fact:
+      nfs_cinder_dir: "{{ nfs_export_dir }}/cinder"
+      nfs_cinder_backup_dir: "{{ nfs_export_dir }}/cinder-backup"
+
+  - name: Create cinder nfs directories
+    file:
+      path: "{{ item }}"
+      state: directory
+      mode: 0777
+      group: nobody
+      owner: nobody
+    with_items:
+      - "{{ nfs_cinder_dir }}"
+      - "{{ nfs_cinder_backup_dir }}"
+
+  - name: Configure cinder export
+    lineinfile:
+      create: true
+      path: /etc/exports.d/cinder.exports
+      line: "{{ item }} *(rw,sync,no_root_squash)"
+    with_items:
+      - "{{ nfs_cinder_dir }}"
+      - "{{ nfs_cinder_backup_dir }}"
+
+  - name: Export NFS share to the server
+    command: "exportfs -r"
+
+
+- hosts: localhost
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+
+  tasks:
+  - set_fact:
+      cinder_yaml_dir: "{{ working_yamls_dir }}/cinder"
+
+  - debug:
+      msg: "yamls will be written to {{ cinder_yaml_dir }} locally"
+
+  - name: Create yaml dir
+    file:
+      path: "{{ cinder_yaml_dir }}"
+      state: directory
+
+  - name: Copy files to yaml dir
+    copy:
+      src: "{{ item }}"
+      dest: "{{ cinder_yaml_dir }}/"
+    with_items:
+    - "ocp/cinder/backup-config.yaml"
+    - "ocp/cinder/volume1-config.yaml"
+
+  - name: Start Cinder
+    shell: |
+      set -e
+      oc apply -n openstack -f "{{ cinder_yaml_dir ~ '/' ~ item }}"
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
+    with_items:
+    - "backup-config.yaml"
+    - "volume1-config.yaml"
+
+  # we apply volume1-config.yaml late and cinder-volume1-0 pod is likely already in
+  # CrashLoopBackOff and therefore won't restart on the CM change by itself
+  - name: Restart cinder-volume
+    shell: |
+      set -e
+      oc delete pod  -n openstack cinder-volume1-0
+    environment:
+      PATH: "{{ oc_env_path }}"
+      KUBECONFIG: "{{ kubeconfig }}"
