@@ -1,0 +1,55 @@
+---
+- hosts: localhost
+  gather_facts: false
+  become: true
+  user: root
+  vars_files: vars/default.yaml
+  roles:
+  - oc_local
+  tasks:    
+    - name: Create performance and sriov YAMLs working dir
+      file:
+        path: "{{ working_yamls_dir }}/{{ item }}"
+        state: directory
+        mode: 0755
+      with_items:
+        - performance
+        - sriov
+
+    - name: Write performance and sriov YAMLs to working dir
+      template:
+        src: "{{ item }}/{{ item }}-sub.yaml.j2"
+        dest: "{{ working_yamls_dir }}/{{ item }}/{{ item }}-sub.yaml"
+      with_items:
+        - performance
+        - sriov
+
+    - name: Apply performance and sriov YAMLs
+      shell: "oc apply -f {{ working_yamls_dir }}/{{ item }}/{{ item }}-sub.yaml"
+      with_items:
+        - performance
+        - sriov
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+
+    - name: Wait for the performance operator to become available
+      shell: oc wait deployment/performance-operator --for condition=Available -n openshift-performance-addon --timeout="{{ default_timeout }}s"
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+      register: performance_op_ready
+      until: performance_op_ready is not failed and performance_op_ready.stdout == 'deployment.apps/performance-operator condition met'
+      retries: "{{ (default_timeout / 5)|int }}"
+      delay: 5
+
+    - name: Wait for the sriov operator to become available
+      shell: oc wait deployment/sriov-network-operator --for condition=Available -n openshift-sriov-network-operator --timeout="{{ default_timeout }}s"
+      environment:
+        PATH: "{{ oc_env_path }}"
+        KUBECONFIG: "{{ kubeconfig }}"
+      register: sriov_op_ready
+      until: sriov_op_ready is not failed and sriov_op_ready.stdout == 'deployment.apps/sriov-network-operator condition met'
+      retries: "{{ (default_timeout / 5)|int }}"
+      delay: 5
+        
