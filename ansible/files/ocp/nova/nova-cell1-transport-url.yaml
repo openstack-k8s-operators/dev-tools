@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Secret
-metadata:
-  name: nova-cell1-transport-url
-  namespace: openstack
-stringData:
-  TransportUrl: amqp://cell1:passw0rd@amq-interconnect.openstack.svc:5672/cell1
