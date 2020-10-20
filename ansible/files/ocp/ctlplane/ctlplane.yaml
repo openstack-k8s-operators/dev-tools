@@ -10,6 +10,11 @@ spec:
     replicas: 1
   placement:
     replicas: 1
+  cinder:
+    cinderAPIReplicas: 1
+    cinderSchedulerReplicas: 1
+    cinderBackupReplicas: 1
+    cinderVolumeReplicas: 1
   nova:
     novaAPIReplicas: 1
     novaSchedulerReplicas: 1
