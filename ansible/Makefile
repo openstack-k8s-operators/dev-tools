@@ -72,8 +72,7 @@ ctlplane-yamls: hosts local-defaults.yaml
 	-i hosts -e @local-defaults.yaml \
 	install_placement_service_init.yaml \
 	install_cinder_service_config.yaml \
-	install_ovn.yaml \
-	install_neutron-api.yaml
+	install_ovn.yaml
 
 podified-ctlplane: ctlplane
 ctlplane: hosts local-defaults.yaml ctlplane-operator ctlplane-yamls
