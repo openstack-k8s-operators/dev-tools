@@ -70,7 +70,6 @@ ctlplane-yamls: hosts local-defaults.yaml
 	# NOTE: requires 'make olm'
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
-	install_placement_service_init.yaml \
 	install_cinder_service_config.yaml \
 	install_ovn.yaml
 
