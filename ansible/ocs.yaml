@@ -9,51 +9,72 @@
   - name: Prepare {{ ocs_worker_domain }} VM for use as a storage node
     when: ocs_enabled == true
     block:
-    - name: Clear host VM memory cache
-      shell: echo 3 | tee /proc/sys/vm/drop_caches
+    - name: Get current {{ ocs_worker_domain }} VM attached disk count
+      shell: "virsh dumpxml {{ ocs_worker_domain }} | grep \"source file='/home/ocs/data/ocs_disk\" | wc -l"
+      register: cur_storage_disks
 
-    - name: Create OCS data disks for {{ ocs_worker_domain }} VM
-      shell: |
-        set -e -o pipefail
+    - name: Get current {{ ocs_worker_domain }} VM memory size
+      shell: "virsh dominfo {{ ocs_worker_domain }} | grep \"Max memory\" | tr -d ' ' | cut -d ':' -f 2 | cut -d 'K' -f 1 | awk '{$1=$1/1024; print $1;}'"
+      register: cur_storage_memory
 
-        for i in {1..{{ ocs_disks | length }}}; do
-            fs="{{ ocs_data_dir }}/ocs_disk_${i}"
+    - name: Get current {{ ocs_worker_domain }} VM vCPU count
+      shell: virsh dominfo ostest_worker_1 | grep CPU\(s\) | tr -d ' ' | cut -d ':' -f 2
+      register: cur_storage_cpu
 
-            if [ ! -f "$fs" ]; then
-                # Create a sparse file of the correct size and populate it with an
-                # ext2 filesystem.
-                mkdir -p {{ ocs_data_dir }}
-                truncate -s {{ ocs_disk_size }}G $fs
-                mkfs.ext2 -m 0 "$fs"
-
-                # Make world readable
-                chown nobody.nobody "$fs"
-                chmod 0777 "$fs"
-            fi
-        done
-
-    - name: Stop {{ ocs_worker_domain }} VM
-      virt: 
-        name: "{{ ocs_worker_domain }}"
-        state: destroyed
-
-    - name: Attach data disks to {{ ocs_worker_domain }} VM
-      command: "virsh attach-disk {{ ocs_worker_domain }} --source {{ ocs_data_dir }}/ocs_disk_{{ index + 1 }} --target {{ item }} --persistent"
-      register: attach_disks
-      failed_when: attach_disks.stderr != "" and "already exists" not in attach_disks.stderr
-      loop: "{{ ocs_disks }}"
-      loop_control:
-        index_var: index
-
-    - name: Set {{ ocs_worker_domain }} VM cpu and memory specs
+    - name: Change {{ ocs_worker_domain }} VM specs
+      when: (cur_storage_disks.stdout | int) != (ocs_disks | length) or (cur_storage_memory.stdout | int) != ocp_storage_memory or (cur_storage_cpu.stdout | int) != ocp_storage_vcpu
       block:
-      - name: Set {{ ocs_worker_domain }} VM memory
-        shell: |
-          virsh setmaxmem {{ ocs_worker_domain }} {{ ocp_storage_memory }}M --config;
-          virsh setmem {{ ocs_worker_domain }} {{ ocp_storage_memory }}M --config
+      - name: Clear host VM memory cache
+        shell: echo 3 | tee /proc/sys/vm/drop_caches
 
-      - name: Set {{ ocs_worker_domain }} VM max cpus
-        command: "virsh setvcpus {{ ocs_worker_domain }} {{ ocp_storage_vcpu }} --config --maximum"
+      - name: Create OCS data disks for {{ ocs_worker_domain }} VM
+        shell: |
+          set -e -o pipefail
+
+          for i in {1..{{ ocs_disks | length }}}; do
+              fs="{{ ocs_data_dir }}/ocs_disk_${i}"
+
+              if [ ! -f "$fs" ]; then
+                  # Create a sparse file of the correct size and populate it with an
+                  # ext2 filesystem.
+                  mkdir -p {{ ocs_data_dir }}
+                  truncate -s {{ ocs_disk_size }}G $fs
+                  mkfs.ext2 -m 0 "$fs"
+
+                  # Make world readable
+                  chown nobody.nobody "$fs"
+                  chmod 0777 "$fs"
+              fi
+          done
+
+      - name: Stop {{ ocs_worker_domain }} VM
+        virt: 
+          name: "{{ ocs_worker_domain }}"
+          state: destroyed
+
+      - name: Attach data disks to {{ ocs_worker_domain }} VM
+        command: "virsh attach-disk {{ ocs_worker_domain }} --source {{ ocs_data_dir }}/ocs_disk_{{ index + 1 }} --target {{ item }} --persistent"
+        register: attach_disks
+        failed_when: attach_disks.stderr != "" and "already exists" not in attach_disks.stderr
+        loop: "{{ ocs_disks }}"
+        loop_control:
+          index_var: index
+
+      - name: Set {{ ocs_worker_domain }} VM cpu and memory specs
+        block:
+        - name: Set {{ ocs_worker_domain }} VM memory
+          shell: |
+            virsh setmaxmem {{ ocs_worker_domain }} {{ ocp_storage_memory }}M --config;
+            virsh setmem {{ ocs_worker_domain }} {{ ocp_storage_memory }}M --config
+
+        - name: Set {{ ocs_worker_domain }} VM max and current cpus
+          shell: |
+            virsh setvcpus {{ ocs_worker_domain }} {{ ocp_storage_vcpu }} --config --maximum;
+            virsh setvcpus {{ ocs_worker_domain }} {{ ocp_storage_vcpu }} --current
+
+      - name: Register fact that {{ ocs_worker_domain }} VM specs changed
+        set_fact:
+          storage_node_specs_updated: true
 
 - hosts: localhost
   gather_facts: false
@@ -66,45 +87,48 @@
   - name: Install OCS
     when: ocs_enabled == true
     block:
-    - name: Annotate associated machine for {{ ocs_worker_node }} for deletion
-      shell: "oc annotate machine/$(oc get bmh/{{ ocp_cluster_name}}-{{ ocs_worker_node }} -n openshift-machine-api --no-headers -o custom-columns=blah:.spec.consumerRef.name) machine.openshift.io/cluster-api-delete-machine=yes -n openshift-machine-api"
-      register: annotate_ocs_node
-      failed_when: annotate_ocs_node.stderr != "" and "not found" not in annotate_ocs_node.stderr
-      environment:
-        PATH: "{{ oc_env_path }}"
-        KUBECONFIG: "{{ kubeconfig }}"
+    - name: De-provision and reprovision associated baremetal host (if {{ocs_worker_domain }} specs changed)
+      when: storage_node_specs_updated is defined and storage_node_specs_updated == true
+      block:
+      - name: Annotate associated machine for {{ ocs_worker_node }} for deletion
+        shell: "oc annotate machine/$(oc get bmh/{{ ocp_cluster_name}}-{{ ocs_worker_node }} -n openshift-machine-api --no-headers -o custom-columns=blah:.spec.consumerRef.name) machine.openshift.io/cluster-api-delete-machine=yes -n openshift-machine-api"
+        register: annotate_ocs_node
+        failed_when: annotate_ocs_node.stderr != "" and "not found" not in annotate_ocs_node.stderr
+        environment:
+          PATH: "{{ oc_env_path }}"
+          KUBECONFIG: "{{ kubeconfig }}"
 
-    - name: Scale worker machineset down by 1
-      shell: "oc scale machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --replicas=$(($(oc get machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --no-headers -o custom-columns=blah:.status.replicas) - 1))"
-      environment:
-        PATH: "{{ oc_env_path }}"
-        KUBECONFIG: "{{ kubeconfig }}"
+      - name: Scale worker machineset down by 1
+        shell: "oc scale machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --replicas=$(($(oc get machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --no-headers -o custom-columns=blah:.status.replicas) - 1))"
+        environment:
+          PATH: "{{ oc_env_path }}"
+          KUBECONFIG: "{{ kubeconfig }}"
 
-    - name: Wait for {{ ocs_worker_node }} to be de-provisioned
-      shell: oc get nodes -l node-role.kubernetes.io/worker
-      retries: 100
-      delay: 15
-      register: storage_node_removed
-      until: ocs_worker_node not in storage_node_removed.stdout
-      environment:
-        PATH: "{{ oc_env_path }}"
-        KUBECONFIG: "{{ kubeconfig }}"
+      - name: Wait for {{ ocs_worker_node }} to be de-provisioned
+        shell: oc get nodes -l node-role.kubernetes.io/worker
+        retries: 100
+        delay: 15
+        register: storage_node_removed
+        until: ocs_worker_node not in storage_node_removed.stdout
+        environment:
+          PATH: "{{ oc_env_path }}"
+          KUBECONFIG: "{{ kubeconfig }}"
 
-    - name: Scale worker machineset up by 1
-      shell: "oc scale machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --replicas=$(($(oc get machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --no-headers -o custom-columns=blah:.status.replicas) + 1))"
-      environment:
-        PATH: "{{ oc_env_path }}"
-        KUBECONFIG: "{{ kubeconfig }}"
+      - name: Scale worker machineset up by 1
+        shell: "oc scale machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --replicas=$(($(oc get machineset/{{ ocp_cluster_name }}-worker-0 -n openshift-machine-api --no-headers -o custom-columns=blah:.status.replicas) + 1))"
+        environment:
+          PATH: "{{ oc_env_path }}"
+          KUBECONFIG: "{{ kubeconfig }}"
 
-    - name: Wait for {{ ocs_worker_node }} to be provisioned
-      shell: oc get nodes -l node-role.kubernetes.io/worker
-      retries: 100
-      delay: 15
-      register: storage_node_ready
-      until: "(storage_node_ready.stdout | regex_findall(ocs_worker_node + '   Ready') | length) == 1"
-      environment:
-        PATH: "{{ oc_env_path }}"
-        KUBECONFIG: "{{ kubeconfig }}"
+      - name: Wait for {{ ocs_worker_node }} to be provisioned
+        shell: oc get nodes -l node-role.kubernetes.io/worker
+        retries: 100
+        delay: 15
+        register: storage_node_ready
+        until: "(storage_node_ready.stdout | regex_findall(ocs_worker_node + '   Ready') | length) == 1"
+        environment:
+          PATH: "{{ oc_env_path }}"
+          KUBECONFIG: "{{ kubeconfig }}"
         
     - name: Create OCS YAMLs working dir
       file:
@@ -161,7 +185,7 @@
       retries: 100
       delay: 15
       register: local_storage_volumes_ready
-      until: (local_storage_volumes_ready.stdout | regex_findall('local-pv-.+Available') | length) == (local_storage_volumes_ready.stdout | regex_findall('local-pv-.+') | length) and (local_storage_volumes_ready.stdout | regex_findall('local-pv-.+Available') | length) != 0
+      until: (local_storage_volumes_ready.stdout | regex_findall('local-pv-.+(Available|Bound)') | length) == (local_storage_volumes_ready.stdout | regex_findall('local-pv-.+') | length) and (local_storage_volumes_ready.stdout | regex_findall('local-pv-.+(Available|Bound)') | length) != 0
       environment:
         PATH: "{{ oc_env_path }}"
         KUBECONFIG: "{{ kubeconfig }}"

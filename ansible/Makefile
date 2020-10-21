@@ -41,19 +41,12 @@ osp_operators_install: compute_node
 compute_node: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
-        09_create_common-config.yaml \
 	12_setup_worker_osp_machineset.yaml
 
 ocp_ovn_controller: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
 	13_switch_ocp_ovn-controller.yaml
-
-
-compute_common_config: hosts local-defaults.yaml
-	ANSIBLE_FORCE_COLOR=true ansible-playbook \
-	-i hosts -e @local-defaults.yaml \
-    09_create_common-config.yaml
 
 osp_content: hosts local-defaults.yaml
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
@@ -77,10 +70,8 @@ ctlplane-yamls: hosts local-defaults.yaml
 	# NOTE: requires 'make olm'
 	ANSIBLE_FORCE_COLOR=true ansible-playbook \
 	-i hosts -e @local-defaults.yaml \
-	install_glance_service_init.yaml \
-	install_nova_service_init.yaml \
-	install_ovn.yaml \
-	install_neutron-api.yaml
+	install_cinder_service_config.yaml \
+	install_ovn.yaml
 
 podified-ctlplane: ctlplane
 ctlplane: hosts local-defaults.yaml ctlplane-operator ctlplane-yamls
